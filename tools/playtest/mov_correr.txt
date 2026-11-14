@@ -1,0 +1,19 @@
+# duplo toque na direcao = correr (comportamento original que deve continuar)
+from cidade
+wait 300
+tap right 100
+wait 100
+press right
+wait 500
+expect run == 1
+release right
+wait 300
+expect mv == 0
+# andar normal (sem duplo toque) nao pode virar corrida
+wait 1500
+press left
+wait 600
+expect run == 0
+expect mv == 1
+release left
+wait 200

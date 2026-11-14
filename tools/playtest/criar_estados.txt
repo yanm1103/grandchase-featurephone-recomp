@@ -1,0 +1,7 @@
+# gera os save states usados por `from <nome>` nos outros cenarios (rode quando o roteiro de boot ou o jogo mudarem)
+boot
+wait 500
+savestate cidade
+teleport 20 200 200 0
+wait 2500
+savestate torre1

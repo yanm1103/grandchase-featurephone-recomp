@@ -1,0 +1,12 @@
+# apertar direita, depois cima sem soltar direita, depois soltar direita (manter cima): deve continuar andando para cima
+from cidade
+wait 300
+press right
+wait 400
+press up
+wait 400
+release right
+wait 600
+expect mv == 1
+release up
+wait 300

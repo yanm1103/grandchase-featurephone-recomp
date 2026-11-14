@@ -1,0 +1,27 @@
+# Grand Chase 1 (recomp) - Android
+
+Sem Gradle: `bash android/build_apk.sh [abi ...]` (padrao `x86_64 arm64-v8a`) gera `build/android/gc1.apk` (~93 MB, assinado com chave de debug).
+Passos do script: CMake/NDK (SDL3 do codigo-fonte em `third_party/SDL3-3.4.20-src` + `libmain.so` = runtime + codigo recompilado + `platform/main_sdl.c`), assets (`build/out/game_ptbr`, `build/out/audio`),
+icone (`platform/icon_src_61.png`), javac + d8 (fontes Java do SDL + `GC1Activity`), aapt2, zipalign, apksigner.
+Ferramentas: `C:\Users\TwistZero\tools\android-sdk` (platform 34, build-tools 35.0.1 - o d8 do 34.0.0 quebra com uma classe do SDL, NDK 27.2, cmake 3.22.1, emulator, imagem x86_64 API 34), JDK 21. AVD `gc1` em `C:\Users\TwistZero\tools\android-avd`.
+
+## Como o app funciona
+- Na primeira execucao copia `assets/game`, `assets/audio` (lista em `files.txt`; `stamp.txt` decide se recopia) para o armazenamento interno (`files/game`, `files/audio`); os saves ficam em `files/save` e nunca sao sobrescritos.
+- Controles de toque (`platform/touch.h`): D-pad, OK, MENU (= CLR/voltar), MINIMAPA, MAPA, SALVAR (popup do jogo), atalhos 1 3 7 9 * 0 #. O botao Voltar do Android = CLR. Teclado fisico/emulador tambem funciona (`keymap.h`).
+  No PC: `gc1.exe --touch` mostra o mesmo layout (o mouse vira dedo); `--selftest-shot arq.bmp` salva uma captura.
+- Save state: no Android, F5/F9 de teclado fisico (`adb shell input keyevent KEYCODE_F5` / `KEYCODE_F9`); o arquivo e `files/save/estado.snap` e e o mesmo formato do PC (um estado gerado no PC carrega no Android).
+
+## Testar no emulador (sem abrir janela)
+```
+emulator -avd gc1 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect     (ANDROID_AVD_HOME=C:\Users\TwistZero\tools\android-avd)
+adb install -r build/android/gc1.apk ; adb shell am start -n dev.gc1.recomp/.GC1Activity
+adb exec-out screencap -p > tela.png          # eu leio a imagem
+adb shell input tap X Y ; adb shell input swipe X Y X Y 1400     # toque / segurar (tela 1080x2400: OK ~ (864,1888), D-pad centro ~ (290,1860))
+adb push build/pt/states/torre1.snap /data/local/tmp/estado.snap ; adb shell run-as dev.gc1.recomp cp /data/local/tmp/estado.snap files/save/estado.snap ; adb shell input keyevent KEYCODE_F9
+```
+(No Git Bash use `MSYS_NO_PATHCONV=1` antes dos comandos `adb shell` com caminhos.) O APK e `debuggable` (para `run-as`); mude em `AndroidManifest.xml` para uma versao final.
+
+## Nao feito / limites
+- Audio no Android nao foi ouvido (o emulador roda com `-no-audio`); o codigo de audio e o mesmo do PC.
+- Sem auto-save ao ir para segundo plano; o Android pode matar o app (use SALVAR do jogo ou o estado).
+- Layout de toque ajustado so para 1080x2400 retrato; sem tablet/paisagem. Sem tela de ajuda/rebind (F1) no toque.

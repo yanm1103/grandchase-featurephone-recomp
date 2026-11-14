@@ -1,0 +1,13 @@
+# a musica de fundo nao pode parar/reiniciar a cada golpe
+from torre1
+wait 200
+mark
+tap ok 80
+wait 400
+tap ok 80
+wait 400
+tap ok 80
+wait 1500
+count sfx >= 3
+count music_on == 0
+count music_off == 0

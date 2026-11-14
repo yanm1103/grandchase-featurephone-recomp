@@ -1,0 +1,12 @@
+{
+ "ui|0x41830": "Sem pergaminho de reviver. Comprar um?|No servico original custava 100 won reais, alem da conexao. A compra pode demorar, nao feche o jogo.|Deseja comprar?",
+ "ui|0x41a10": "Este jogo e avulso e nao cobra para jogar.|Na versao original, a conexao com a rede gerava tarifa e os itens pagos tinham custo adicional.",
+ "ui|0x420f8": "No servico original, a Chave Enferrujada custa 500 won reais, alem da conexao, e rende 1 item mobile.|A compra pode demorar, nao feche o jogo.|Deseja abrir?",
+ "ui|0x421c4": "No servico original, a Chave de Ferro custa 900 won reais, alem da conexao, e rende 2 itens mobile ou 1 cupom online.|A compra pode demorar, nao feche o jogo.|Deseja abrir?",
+ "ui|0x422a0": "No servico original, a Chave de Ouro custa 1300 won reais, alem da conexao, e rende 3 itens mobile ou 1 cupom online.|A compra pode demorar, nao feche o jogo.|Deseja abrir?",
+ "menu|menu.tx|40": "Escolher personagem/Classe versatil e equilibrada.$",
+ "menu|menu.tx|41": "Escolher personagem/Classe defensiva, de ataque fraco.$",
+ "menu|menu.tx|42": "Escolher personagem/Classe de ataque alto e boa esquiva.$",
+ "ui|0x4258c": "STR: ataque|DEX: defesa,acerto|e esquiva|VIT: HP|LUK: critico,forja",
+ "menu|menu.tx|13": "Controles/Mover : setas, 2 4 6 8|Atacar : OK, 5|Menu, cancelar : CLR|Atalhos : 1 3 7 9 0 *|Atalhos extras : #|Quick save : tecla Ligar|Minimapa : tecla sup. esq.|Mapa-mundi : tecla sup. dir.||No PC, aperte F1 para ver|e trocar as teclas.$"
+}

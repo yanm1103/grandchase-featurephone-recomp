@@ -1,0 +1,12 @@
+# segurar direita e dar golpes no meio: depois dos golpes ele continua andando (a direita continua apertada)
+from torre1
+wait 200
+press right
+wait 600
+tap ok 80
+wait 400
+tap ok 80
+wait 1000
+expect mv == 1
+release right
+wait 300

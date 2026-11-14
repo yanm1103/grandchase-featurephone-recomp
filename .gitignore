@@ -1,0 +1,14 @@
+# saidas de build e artefatos locais
+build/*
+!build/build.sh
+!build/env.sh
+gen/
+*.pyc
+__pycache__/
+# terceiros e referencias baixadas (SDL3, Unicorn, wie)
+third_party/
+ref/
+# material extraido do jogo (reprodutivel pelos scripts; nao versionar)
+tools/translate/work/catalog.json
+tools/translate/work/batches/
+tools/translate/work/str_br_s5.txt
