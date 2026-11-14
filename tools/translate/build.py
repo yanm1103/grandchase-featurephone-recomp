@@ -140,6 +140,8 @@ wr('binary.mod', bytes(mod))
 
 # 6. grind das missoes: contagens na tabela e nos scripts de entrega (os textos ja foram trocados em grind.edit_texts)
 print('grind: %d textos alterados; registros/remocoes de item: %s' % (len(grind_changed), grind.patch_binary(OUT)))
+import dennis
+print('dennis: n56.scp vira loja; %d precos fixados em ConstData' % dennis.patch_binary(OUT))
 
 # ---------------- verificacao por releitura ----------------
 def reread():

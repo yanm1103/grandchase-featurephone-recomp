@@ -258,6 +258,35 @@ static uint32_t hook_walk_anim(Cpu *c) {
     *c = saved; return lr;
 }
 
+/* ---------------- loja do Dennis (NPC 56, tipo de loja 0xa) ----------------
+ * No original ele abria o mercado entre jogadores (rede). Agora o script dele usa o menu de loja (Comprar/Vender/Conversar/Presentear/Sair, igual ao da Marsha;
+ * tools/translate/dennis.py) e shop_rebuild_stock (0x315ac) monta o estoque dele: as curas e receitas que nenhuma loja/drop entrega (ids abaixo; abas Cura e
+ * Suprimentos, ate 40 por aba), os 5 bilhetes de desafio de chefe (que so saiam dos baus) e os 6 pacotes de armadura. Os precos que estavam zerados sao fixados em
+ * ConstData.br por dennis.py. Os outros NPCs seguem o codigo original. */
+#define A_SHOP_REBUILD  0x315acu
+#define A_SHOP_ADD      0x308e8u
+#define G_NPC_SHOP_TYPE 0x162ba6bu
+#define G_SHOP_HEAL     0x162b418u
+#define G_SHOP_UTIL     0x162dcf0u
+static BlockFn orig_shop;
+static const uint16_t DENNIS_STOCK[] = {
+    0xd07, 0xd15, 0xd16, 0xd17, 0xd18, 0xd1a, 0xd1b, 0xd1c, 0xd1d, 0xd1e,                      /* cura: capsula de SP, comidas, curas de status */
+    0xe05, 0xe06, 0xe07, 0xe08, 0xe09,                                                          /* bilhetes dos 5 ultimos chefes da expedicao */
+    0xe4f, 0xe50, 0xe51, 0xe52, 0xe53, 0xe54,                                                   /* pacotes de armadura (4 pecas de um set) */
+    0xe2a, 0xe4b, 0xe4c, 0xe4d,                                                                 /* receitas */
+};
+static uint32_t hook_shop_rebuild(Cpu *c) {
+    Cpu saved = *c; uint32_t lr = c->r[14];
+    if (LD8(G_NPC_SHOP_TYPE) == 0x0a) {
+        for (uint32_t i = 0; i < 40; i++) { ST16(G_SHOP_HEAL + 0x10 * i, 0); ST16(G_SHOP_UTIL + 0x10 * i, 0); }
+        for (unsigned i = 0; i < sizeof DENNIS_STOCK / sizeof *DENNIS_STOCK; i++) gcall(A_SHOP_ADD, 4, DENNIS_STOCK[i], 1, 0xffffffffu, 0, 0, 0);
+    } else {
+        uint32_t i0 = (A_SHOP_REBUILD - TEXT_BASE) >> 1; BlockFn hook = gc_blocks[i0]; gc_blocks[i0] = orig_shop;
+        gcall(A_SHOP_REBUILD, 0, 0, 0, 0, 0, 0, 0); gc_blocks[i0] = hook;
+    }
+    *c = saved; return lr;
+}
+
 static BlockFn install(uint32_t addr, BlockFn fn) { uint32_t i = (addr - TEXT_BASE) >> 1; BlockFn o = NULL; if (i < gc_text_halfwords && gc_blocks[i]) { o = gc_blocks[i]; gc_blocks[i] = fn; } return o; }
 void gc1_patches_reset(void) { g_acc_img[3] = 0; }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
 void gc1_patches_install(void) {
@@ -269,4 +298,5 @@ void gc1_patches_install(void) {
     install(A_RESOLVE_CHEST, hook_resolve_chest);
     g_nodiag = getenv("GC1_NODIAG") != NULL; g_diagdbg = getenv("GC1_DIAGDBG") != NULL;
     orig_walk = install(A_WALK_ANIM, hook_walk_anim);
+    orig_shop = install(A_SHOP_REBUILD, hook_shop_rebuild);
 }

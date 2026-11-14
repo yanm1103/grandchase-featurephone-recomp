@@ -1,27 +1,40 @@
-# Problemas do jogo (lista viva)
+# Pendências do projeto (lista viva)
 
-Formato: [estado] titulo - causa - onde foi tratado / teste que cobre.
+Só o que falta. O que já foi feito saiu daqui (histórico no git e nos docs: `docs/`, `android/README.md`, `tools/playtest/README.md`, `tools/translate/README.md`).
+Formato: [ ] a fazer, [~] feito pela metade.
 
-## Resolvidos
-- [ok] **Movimento falho (para / nao anda)** - o jogo e feito para teclado de celular (uma tecla por vez): soltar QUALQUER tecla chama `stop_player_movement`
-  (0x14394), e apertar direcao durante ataque/acao e ignorado. Tratado em `runtime/hle.c` (`gc1_input_key`, camada de entrada): direcoes seguradas viram uma pilha,
-  soltar tecla que nao e direcao nao para mais, soltar uma direcao com outra segurada troca para ela, aperto ignorado e repetido quando o jogo fica livre.
-  Testes: `tools/playtest/mov_rollover.txt`, `mov_attack.txt` (falham com `--raw`, passam sem).
-- [ok] **Correr (toque duplo) quase impossivel** - o jogo conta 4 quadros (160 ms) desde o aperto; a camada nova conta 6 quadros (240 ms) desde a soltura. Teste `mov_correr.txt`.
-- [ok] **Musica para e recomeca a cada golpe** - o jogo so tem 1 clipe de audio: para e libera a musica, carrega o efeito no mesmo clipe e depois recarrega a musica do inicio.
-  Tratado em `runtime/audio_policy.c` (musica em loop + efeitos mixados por cima; recarregar a mesma musica nao reinicia). SDL: `platform/main_sdl.c` (1 fluxo de musica + 8 de efeitos). Teste `musica_golpe.txt`.
-- [ok] **Teclas confusas / sem ajuda** - mapa de teclas configuravel em `platform/keymap.h` (F1 abre a tela de ajuda e permite trocar; salva em `<saves>/controles.ini`).
-  Padrao novo: setas/WASD andam, Z/Enter/Espaco atacam, **Esc/X/Backspace = menu/voltar (CLR)**, Q/Tab minimapa, E/M mapa-mundi, F6/P salvar (popup do jogo), V = `*`, C = `#`.
-- [ok] **Save state** - **F5 salva / F9 carrega** a foto completa do jogo (qualquer lugar, ate em combate), separado do salvar do proprio jogo (F6/P). F1, F5, F9, F11 sao reservadas.
-- [ok] **Andar na diagonal (PC/gamepad)** - o jogo so tem 4 direcoes/sprites, entao a diagonal e so de movimento: `runtime/patch.c` (`hook_walk_anim`, gancho em player_update_walk_anim 0x23fe4) soma passos no eixo da outra direcao segurada (`gc1_diag_secondary` em hle.c), ciclo de 3 quadros (2 passos por eixo, ~94% da velocidade da reta, sempre multiplo de 8 px), com a mesma colisao do jogo (tile 8 px a frente, monstros, minerio/bau). So andando (nao correndo) e livre (acao 0). `GC1_NODIAG=1` desliga; `GC1_DIAGDBG=1` avisa se o jogador parar em cima de parede (0 casos em 6 testes aleatorios de ~400 teclas na cidade e na torre1). Teste `mov_diag.txt` (falha com `GC1_NODIAG=1`). **Falta:** D-pad de toque do Android (um dedo = uma tecla; precisa de zonas diagonais que mandem duas teclas); conferir no jogo real saidas de mapa/NPC/bau passando na diagonal e quinas estreitas.
-  O texto de ajuda do jogo (menu.tx linha 13) continua com os nomes do celular ("CLR", "tecla Ligar") + uma linha avisando do F1.
+## Testar / conferir
+- [ ] **Celular, APK instalado em 2026-11-14 sem conferir:** botão SOBRE da gaveta (créditos + wons/medalhas/cupons), loja do Dennis (aba Suprimentos nunca foi vista na tela, só o estoque na memória), correção do `auto.snap` (minimizar e voltar; abrir o app depois de sair pelo jogo não deve mais voltar a ponto velho).
+- [ ] **Andar na diagonal:** conferir no jogo real saídas de mapa, NPC e baú passando na diagonal e quinas estreitas (`GC1_DIAGDBG=1` avisa se o jogador parar em cima de parede).
+- [ ] **Ranking da Comunidade:** o servidor falso usa como pontuação o primeiro valor que o jogo manda (maior campo +3 dos saves), sem saber o que é; ver se faz sentido jogando.
+- [ ] **Cupom/medalha:** conferir no jogo real que a medalha aparece na caixa "Obteve..." e o cupom no aviso do topo e em Comunidade > Cupons (testado só com `GC1_NETLUCK=100` e direto no código).
 
-## Em aberto
-- [ok] **Palavras cortadas no meio em dicas/avisos** ("teletran-sportar", "visi-tou") - o jogo quebra por caractere em `text_draw_wrapped`; `runtime/patch.c` agora quebra por palavra. Achados nos testes aleatorios: 9 textos (dicas de teletransporte/refino/bau/runas/mudanca de classe, "Digite o valor...", cobranca de conexao); `--wraplog arq` do headless lista os que ainda caem no corte por caractere (palavra maior que a linha).
-- [ok] **Acentos** - motor (24 letras acentuadas por patch de glifos + `charset.py`) e texto: os 4.877 textos foram acentuados por agentes em 41 lotes (`tools/translate/acentos.py check`: 0 erros, so acentos adicionados). Conferido por quadros: titulo, intro, dialogos, nomes de lugar, dicas. Sem revisao humana: pode haver acento errado (ex.: "e"/"é", "esta"/"está"); corrija em `work/acentos/out/NN.json` e rode `python -I tools/translate/build.py`.
-- [ ] Texto quebra de linha antes do esperado (margem de seguranca em `tools/translate/build.py`: DLG_W/DESC_W/QUEST_W).
-- [ ] Traducao PT-BR (retraduzida do coreano) nao foi revisada por humano; telas nao conferidas: lojas, inventario, habilidades, HUD de combate, finais.
-- [~] Port Android: APK funcionando no emulador e num celular real (Realme RMX3780, arm64, 1080x2400; testado 2026-11-13/14): boot, toque, D-pad, ataque, musica e efeitos sonoros, textos/acentos e desempenho ok, botoes confortaveis. Janela normal (barra de status e de navegacao visiveis), app chamado "Grand Chase Mobile". Gaveta de estado na borda esquerda (aba arrastavel na vertical enquanto fechada, posicao salva em `gaveta.txt`; aberta mostra SALVAR ESTADO / CARREGAR ESTADO, que so disparam ao soltar o dedo em cima; = F5/F9) e **foto automatica ao minimizar/fechar** (`auto.snap`, retomada ao abrir o app) - testado no celular. Ver `android/README.md`. Falta: tela de ajuda (F1) no toque, APK de release (hoje debuggable, chave de debug).
-- [ ] `build.sh all`/`ref` nao liga (falta `gc1_cov_dump` no backend unicorn) - ja estava assim antes; `headless` e `sdl` funcionam.
-- [ok] **Tamanho do audio** - as 20 musicas (WAV 44,1 kHz estereo, 77 MB) viram Ogg Vorbis (q4, ~128 kbps, 6 MB) com `python -I tools/compress_audio.py build/out/audio` (os WAV originais vao para `build/out/audio_wav`, fora do APK; efeitos pequenos continuam WAV). `platform/main_sdl.c` (`get_wav`) procura `<hash>.ogg` e depois `<hash>.wav`, decodifica com `platform/stb_vorbis.c` (dominio publico) ao tocar e descarta musicas grandes antigas da memoria. O nome do arquivo continua sendo o hash FNV-64 do MMF original (a politica de audio nao muda). Pasta de audio 77 MB -> 7,4 MB; APK arm64 105 MB -> 22 MB. Conferido no celular (decodifica a musica, log `audio: ... decodificado`). Rode `compress_audio.py` depois de `make_audio.py` e antes de `build_apk.sh`.
-- [ok] **Filtros de imagem (shaders)** - NORMAL, LCD, CRT, xBRZ e ScaleFX (os shaders do Miki's World/libretro, sem o sharp). `platform/gfx_filter.h`: renderer GPU do SDL3 (Vulkan + SPIR-V) com fragment shaders customizados so no quadro do jogo; `platform/shaders/*.frag` (GLSL 450; README la explica a cadeia de 5 passes do ScaleFX) -> `tools/build_shaders.py` gera `platform/shaders_spv.h` (versionado; precisa do glslc do Vulkan SDK so ao mexer nos shaders). PC: **F2** troca; Android: botao FILTRO na gaveta de estado. Escolha salva em `<saves>/filtro.txt`. Sem Vulkan/GPU o jogo cai no renderer comum (so NORMAL). No Mali do celular o Vulkan do SDL so sobe com os recursos opcionais desligados (anisotropia, depth clamp, clip distance, draw indirect first instance). Testado no PC e no celular (as 5 opcoes renderizam). `--load-state arq.snap` no gc1.exe abre direto num estado. **Licenca:** `xbrz.frag` e GPLv3 (HqMAME) - atencao ao publicar/distribuir binarios; o resto e MIT. **Nao medido:** custo de CPU/GPU/bateria do ScaleFX durante o jogo no celular; xBRZ/ScaleFX com ghosting (nao implementado).
+## Rede e itens (decisões do usuário em 2026-11-14: tudo grátis e offline; ver `docs/INVESTIGACAO_REDE_ITENS.md`)
+- [ ] **Itens sem fonte local:** as curas e receitas entraram na loja do Dennis, mas rosto (20 itens), anéis, colares, asas, pets (Goldie, CaoCao, Ninko) e peças de set (Comandante, Celestial, Cristal, Alma Sagrada, Bulls) ainda não saem de lugar nenhum. A tela da loja do Dennis só mostra Cura/Suprimentos: precisa de outra loja (equipamentos) ou de drops raros.
+- [ ] **Preços do Dennis são chute:** bilhetes de chefe e05-e09 (25.000 a 60.000 GP) e pacotes de armadura e4f-e54 (30.000 a 130.000 GP). Ajustar em `tools/translate/dennis.py` (`PRECOS`); a lista de itens está em `runtime/patch.c` (`DENNIS_STOCK`).
+- [ ] **Texto da tela de abertura (ui 0x41b24)** ainda promete cupons do Grand Chase online da Netmarble.
+- [ ] **Contador de wons é global** (`<saves>/online.sav`), não por slot; o aviso do cupom é um aviso da plataforma (a caixa "Obteve..." do jogo não tem espaço para o código).
+- [ ] Mercado entre jogadores, correio e loja de cash: inalcançáveis (servidor falso responde "Serviço online encerrado"); não vale reimplementar.
+
+## Telas e textos
+- [ ] **Tela de contexto única no primeiro boot** no lugar das duas telas de texto iniciais (a primeira é "[Aviso] Este jogo é avulso e não cobra para jogar..." ui 0x41a10, que já não bate com o que existe; a segunda não foi capturada): diagonal, grind 1/3, mineração, save/load state, filtros, tela Sobre. Pode reaproveitar `about_draw` (`platform/keymap.h`).
+- [ ] Texto quebra de linha antes do esperado (margem de segurança em `tools/translate/build.py`: DLG_W/DESC_W/QUEST_W).
+- [ ] **Tradução PT-BR e acentos sem revisão humana** (retraduzida do coreano por agentes; pode haver "e"/"é", "esta"/"está" trocados). Telas não conferidas: lojas, inventário, habilidades, HUD de combate, finais. Corrigir em `tools/translate/work/acentos/out/NN.json` (vence `overrides.json`) e rodar `python -I tools/translate/build.py`; depois apagar `build/pt/states/` (os estados guardam os textos).
+- [ ] O texto de ajuda do jogo (menu.tx linha 13) ainda cita os nomes do celular ("CLR", "tecla Ligar").
+
+## Android
+- [ ] Tela de ajuda de teclas (F1) no toque.
+- [ ] APK de release (hoje `debuggable`, chave de debug).
+- [ ] Medir custo de CPU/GPU/bateria do filtro ScaleFX jogando no celular.
+
+## Gráficos
+- [ ] Ghosting (xBRZ/ScaleFX) não implementado.
+- [ ] **Licença:** `platform/shaders/xbrz.frag` é GPLv3 (HqMAME); ver antes de distribuir binários.
+
+## Framerate (plano em `docs/INVESTIGACAO_FRAMERATE.md`, nada implementado)
+- [ ] Decidir: período exato de 60 ms vs travado no vsync; forçar 50 Hz vs interpolação; +60 ms de latência vs extrapolação; velocidade 2 como padrão do jogo novo; escopo da interpolação; janela do toque duplo (6 quadros).
+
+## Build e publicação
+- [ ] `build.sh all`/`ref` não liga (falta `gc1_cov_dump` no backend Unicorn); `headless` e `sdl` funcionam.
+- [ ] Antes de publicar o repositório: licenças (xBRZ GPLv3, Unicorn GPL só no backend de referência), textos traduzidos, ícone, nome/e-mail no histórico do git.
+- [ ] **Commitar:** servidor falso, tela Sobre, loja do Dennis e correção do `auto.snap` estão no disco, sem commit.
