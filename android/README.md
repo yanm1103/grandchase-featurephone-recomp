@@ -1,6 +1,6 @@
 # Grand Chase 1 (recomp) - Android
 
-Sem Gradle: `bash android/build_apk.sh [abi ...]` (padrao `x86_64 arm64-v8a`) gera `build/android/gc1.apk` (~93 MB, assinado com chave de debug).
+Sem Gradle: `bash android/build_apk.sh [abi ...]` (padrao `x86_64 arm64-v8a`) gera `build/android/gc1.apk` (~34 MB com x86_64+arm64, ~22 MB so arm64; antes de gerar, comprima a musica: `python -I tools/compress_audio.py build/out/audio`; assinado com chave de debug).
 Passos do script: CMake/NDK (SDL3 do codigo-fonte em `third_party/SDL3-3.4.20-src` + `libmain.so` = runtime + codigo recompilado + `platform/main_sdl.c`), assets (`build/out/game_ptbr`, `build/out/audio`),
 icone (`platform/icon_src_61.png`), javac + d8 (fontes Java do SDL + `GC1Activity`), aapt2, zipalign, apksigner.
 Ferramentas: `C:\Users\TwistZero\tools\android-sdk` (platform 34, build-tools 35.0.1 - o d8 do 34.0.0 quebra com uma classe do SDL, NDK 27.2, cmake 3.22.1, emulator, imagem x86_64 API 34), JDK 21. AVD `gc1` em `C:\Users\TwistZero\tools\android-avd`.
@@ -24,6 +24,6 @@ adb push build/pt/states/torre1.snap /data/local/tmp/estado.snap ; adb shell run
 ## Nao feito / limites
 - Audio no Android nao foi ouvido (o emulador roda com `-no-audio`); o codigo de audio e o mesmo do PC.
 - Sem auto-save ao ir para segundo plano; o Android pode matar o app (use SALVAR do jogo ou o estado).
-- Layout de toque ajustado so para 1080x2400 retrato; sem tablet/paisagem. Sem tela de ajuda/rebind (F1) no toque.
+- Layout de toque ajustado so para 1080x2400 retrato; so retrato (paisagem e tablet foram dispensados pelo usuario). Sem tela de ajuda/rebind (F1) no toque.
 
 - Estado na tela: aba na borda esquerda (arraste na vertical para mudar a altura enquanto fechada; fica em `files/save/gaveta.txt`) abre uma gaveta com SALVAR ESTADO / CARREGAR ESTADO (mesma foto do F5/F9, `files/save/estado.snap`); o botao so dispara ao soltar o dedo em cima dele, e tocar fora fecha. Ao minimizar ou fechar, o app grava `files/save/auto.snap` e ao abrir de novo retoma dali; a gravacao sai de um observador de eventos (`bg_watch` em `platform/main_sdl.c`), porque o SDL bloqueia o app logo apos enfileirar WILL_ENTER_BACKGROUND.

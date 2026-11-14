@@ -10,35 +10,58 @@
 #include "gc1.h"
 
 static SDL_Window *win; static SDL_Renderer *ren; static SDL_Texture *tex; static int g_touch_ui;
-static int g_dirty; static const char *g_audio_dir = "audio";
+static int g_dirty, g_gw = 240, g_gh = 320; static const char *g_audio_dir = "audio";
 static SDL_AudioDeviceID g_dev;
+#include "gfx_filter.h"
 static FILE *g_rec; static uint64_t g_rec_t0;      /* --record: grava as teclas como roteiro para o headless */
 
 /* ---------------- video ---------------- */
 void host_flush(const uint16_t *fb, int w, int h) {
     if (!tex) {
-        tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, w, h);
+        tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, w, h);
         SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST);
         if (!g_touch_ui) SDL_SetRenderLogicalPresentation(ren, w, h, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
     }
-    SDL_UpdateTexture(tex, NULL, fb, w * 2);
-    g_dirty = 1;
+    static uint32_t rgba[240 * 320 * 2]; size_t np = (size_t)w * (size_t)h; if (np > sizeof rgba / sizeof *rgba) np = sizeof rgba / sizeof *rgba;
+    for (size_t i = 0; i < np; i++) { uint32_t p = fb[i], r5 = p >> 11, g6 = (p >> 5) & 63, b5 = p & 31; rgba[i] = 0xff000000u | ((b5 << 3 | b5 >> 2) << 16) | ((g6 << 2 | g6 >> 4) << 8) | (r5 << 3 | r5 >> 2); }
+    SDL_UpdateTexture(tex, NULL, rgba, w * 4);
+    g_gw = w; g_gh = h; g_dirty = 1;
 }
 
 /* ---------------- audio: clipe MMF -> WAV pre-renderizado, casado pelo hash FNV-64 dos bytes ----------------
  * A politica (musica em loop + efeitos mixados por cima, sem reiniciar a musica a cada golpe) esta em runtime/audio_policy.c;
  * aqui so se toca: 1 fluxo de musica e 8 de efeitos, todos ligados ao dispositivo (o SDL mixa). */
 #include "audio_policy.h"
-typedef struct { uint64_t hash; Uint8 *wav; Uint32 len; SDL_AudioSpec spec; int tried; } Wav;
+/* decodificador Ogg Vorbis (stb_vorbis, dominio publico; incluido no fim deste arquivo porque suas macros colidem com nomes daqui):
+ * a musica vai no APK em .ogg e e decodificada ao tocar */
+extern int stb_vorbis_decode_memory(const unsigned char *mem, int len, int *channels, int *sample_rate, short **output);
+typedef struct { uint64_t hash; Uint8 *wav; Uint32 len; SDL_AudioSpec spec; int fail, ogg; } Wav;
 static Wav wavs[256]; static int nwavs;
 static SDL_AudioStream *mus_st, *sfx_st[8]; static int sfx_next; static Wav *mus_w;
 static float g_gain = 1.0f;
+static void wav_unload(Wav *w) { if (!w->wav) return; if (w->ogg) free(w->wav); else SDL_free(w->wav); w->wav = NULL; w->len = 0; }
+/* Procura <hash>.ogg (musicas, pasta de audio) e, se nao houver, <hash>.wav (efeitos, pequenos). Clipes grandes (musica) ja decodificados
+ * ocupam ~10 MB cada: ao carregar um novo, os outros grandes (menos o que toca agora) saem da memoria e voltam a ser decodificados se preciso. */
 static Wav *get_wav(uint64_t h) {
-    for (int i = 0; i < nwavs; i++) if (wavs[i].hash == h) return wavs[i].wav ? &wavs[i] : NULL;
-    if (nwavs >= 256) return NULL;
-    Wav *w = &wavs[nwavs++]; w->hash = h;
-    char path[600]; SDL_snprintf(path, sizeof path, "%s/%016llx.wav", g_audio_dir, (unsigned long long)h);
-    if (!SDL_LoadWAV(path, &w->spec, &w->wav, &w->len)) { w->wav = NULL; SDL_Log("audio: sem WAV para o clipe %016llx", (unsigned long long)h); return NULL; }
+    Wav *w = NULL;
+    for (int i = 0; i < nwavs; i++) if (wavs[i].hash == h) { w = &wavs[i]; break; }
+    if (w && w->fail) return NULL;
+    if (w && w->wav) return w;
+    if (!w) { if (nwavs >= 256) return NULL; w = &wavs[nwavs++]; memset(w, 0, sizeof *w); w->hash = h; }
+    char path[600]; SDL_snprintf(path, sizeof path, "%s/%016llx.ogg", g_audio_dir, (unsigned long long)h);
+    size_t fsz = 0; void *file = SDL_LoadFile(path, &fsz);
+    if (file) {
+        int ch = 0, rate = 0; short *pcm = NULL; int n = stb_vorbis_decode_memory((const unsigned char *)file, (int)fsz, &ch, &rate, &pcm);
+        SDL_free(file);
+        if (n <= 0 || !pcm) { w->fail = 1; SDL_Log("audio: falha ao decodificar %s", path); return NULL; }
+        w->wav = (Uint8 *)pcm; w->len = (Uint32)n * (Uint32)ch * 2; w->ogg = 1; w->spec.format = SDL_AUDIO_S16; w->spec.channels = ch; w->spec.freq = rate;
+        SDL_Log("audio: %016llx.ogg decodificado (%d canais, %d Hz, %.1f s)", (unsigned long long)h, ch, rate, (double)n / rate);
+    } else {
+        SDL_snprintf(path, sizeof path, "%s/%016llx.wav", g_audio_dir, (unsigned long long)h);
+        if (!SDL_LoadWAV(path, &w->spec, &w->wav, &w->len)) { w->wav = NULL; w->fail = 1; SDL_Log("audio: sem clipe para %016llx", (unsigned long long)h); return NULL; }
+        w->ogg = 0;
+    }
+    if (w->len > (1u << 20)) for (int i = 0; i < nwavs; i++) if (&wavs[i] != w && &wavs[i] != mus_w && wavs[i].len > (1u << 20)) wav_unload(&wavs[i]);
     return w;
 }
 static SDL_AudioStream *stream_for(SDL_AudioStream **slot, const SDL_AudioSpec *spec) {
@@ -156,7 +179,7 @@ static void android_extract(const char *base) {
 
 
 int main(int argc, char **argv) {
-    const char *res = "game", *save = "save", *selftest = NULL, *selftest_state = NULL; int nohelp = 0; int scale = 3, full = 0, raw_input = 0, st_n = 0;
+    const char *res = "game", *save = "save", *selftest = NULL, *selftest_state = NULL, *load_state = NULL; int nohelp = 0; int scale = 3, full = 0, raw_input = 0, st_n = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--res") && i + 1 < argc) res = argv[++i];
         else if (!strcmp(argv[i], "--save") && i + 1 < argc) save = argv[++i];
@@ -167,6 +190,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--selftest-shot") && i + 1 < argc) { selftest = argv[++i]; nohelp = 1; }
         else if (!strcmp(argv[i], "--selftest-state") && i + 1 < argc) selftest_state = argv[++i];   /* F5, depois F9 (eventos sinteticos), captura BMP e sai */
         else if (!strcmp(argv[i], "--selftest-help") && i + 1 < argc) selftest = argv[++i];   /* abre a ajuda, salva uma captura BMP e sai (para teste automatico) */
+        else if (!strcmp(argv[i], "--load-state") && i + 1 < argc) load_state = argv[++i];     /* comeca de um save state (ex.: build/pt/states/cidade.snap) */
         else if (!strcmp(argv[i], "--fullscreen")) full = 1;        else if (!strcmp(argv[i], "--record") && i + 1 < argc) g_rec = fopen(argv[++i], "w");
     }
     SDL_CreateDirectory(save);
@@ -180,11 +204,12 @@ int main(int argc, char **argv) {
     keymap_load(save); touch_cfg_load(save); g_savedir = save; SDL_AddEventWatch(bg_watch, NULL);
     if (g_touch_ui) SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");
     win = SDL_CreateWindow("Grand Chase 1 (recomp)", g_touch_ui ? 405 : 240 * scale, g_touch_ui ? 880 : 320 * scale, SDL_WINDOW_RESIZABLE | (full ? SDL_WINDOW_FULLSCREEN : 0));
-    ren = win ? SDL_CreateRenderer(win, NULL) : NULL;
+    ren = win ? gfx_create_renderer(win) : NULL;
     if (!ren) { SDL_Log("janela/renderer: %s", SDL_GetError()); return 1; }
 #ifdef __ANDROID__
     android_extract(abase);
 #endif
+    gfx_init(ren, save);
     g_dev = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL); ap_init(&g_audio_out);
     gc1_set_time(game_now());
     int rc = gc1_boot(res, save);
@@ -195,6 +220,7 @@ int main(int argc, char **argv) {
         return rc;
     }
     gc1_start(); g_rec_t0 = now_ms(); if (!raw_input) gc1_input_enable(1);
+    if (load_state) { gc1_set_time(game_now()); state_file(0, load_state, 1, ""); }
 #ifdef __ANDROID__
     { char path[620]; SDL_snprintf(path, sizeof path, "%s/auto.snap", save); gc1_set_time(game_now());
       if (state_file(0, path, 1, "") == 0) { SDL_snprintf(g_toast, sizeof g_toast, "Continuando de onde parou"); g_toast_until = now_ms() + 2200; g_dirty = 1; } }
@@ -223,6 +249,9 @@ int main(int argc, char **argv) {
                         if (g_help) for (int i = 0; i < 512; i++) if (held[i]) { rec_key(held[i], 0); gc1_input_key(held[i], 0); held[i] = 0; }
                         break;
                     }
+                    if (!g_help && e.key.key == SDLK_F2) {                                  /* filtro de imagem: NORMAL / LCD / CRT ... */
+                        gfx_filter_next(); SDL_snprintf(g_toast, sizeof g_toast, "Filtro: %s", gfx_filter_name()); g_toast_until = now_ms() + 1500; g_dirty = 1; break;
+                    }
                     if (!g_help && (e.key.key == SDLK_F5 || e.key.key == SDLK_F9)) {      /* save state: foto completa do jogo, em qualquer lugar */
                         char path[620]; SDL_snprintf(path, sizeof path, "%s/estado.snap", save);
                         if (e.key.key == SDLK_F5) state_file(1, path, 0, "Estado salvo (F9 carrega)"); else state_file(0, path, 0, "Estado carregado");
@@ -246,6 +275,7 @@ int main(int argc, char **argv) {
             have = SDL_PollEvent(&e);
         }
         gc1_set_time(game_now());
+        if (g_state_req == 3) { gfx_filter_next(); g_state_req = 0; g_dirty = 1; }           /* botao FILTRO da gaveta (toque) */
         if (g_state_req) {
             char path[620]; SDL_snprintf(path, sizeof path, "%s/estado.snap", save);
             if (g_state_req == 1) state_file(1, path, 0, "Estado salvo"); else state_file(0, path, 0, "Estado carregado");
@@ -264,7 +294,7 @@ int main(int argc, char **argv) {
             if (st_n == 32) { SDL_Surface *sf = SDL_RenderReadPixels(ren, NULL); if (sf) { SDL_SaveBMP(sf, selftest); SDL_DestroySurface(sf); } run = 0; }
         }
         if (g_dirty && tex) { g_dirty = 0; SDL_SetRenderDrawColor(ren, 0, 0, 0, 255); SDL_RenderClear(ren);
-            if (g_touch_ui) { touch_layout(); SDL_RenderTexture(ren, tex, NULL, &g_game_rect); touch_draw(ren); } else SDL_RenderTexture(ren, tex, NULL, NULL);
+            if (g_touch_ui) { touch_layout(); gfx_draw_game(ren, tex, &g_game_rect, g_gw, g_gh); touch_draw(ren); } else gfx_draw_game(ren, tex, NULL, g_gw, g_gh);
             if (g_help && !g_touch_ui) help_draw(ren);
             if (now_ms() < g_toast_until) { SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(ren, 0, 0, 0, 200); float tk = g_touch_ui ? SDL_max(1.0f, SDL_floorf(g_scr_w / 240.0f)) : 1.0f; SDL_SetRenderScale(ren, tk, tk); SDL_FRect bx = {0, 0, (g_touch_ui ? g_scr_w : 240) / tk, 14}; SDL_RenderFillRect(ren, &bx); SDL_SetRenderDrawColor(ren, 255, 235, 120, 255); SDL_RenderDebugText(ren, 6, 3, g_toast); SDL_SetRenderScale(ren, 1, 1); g_dirty = 1; }
             SDL_RenderPresent(ren); }
@@ -273,3 +303,7 @@ int main(int argc, char **argv) {
     SDL_Quit();
     return 0;
 }
+
+#define STB_VORBIS_NO_STDIO
+#define STB_VORBIS_NO_PUSHDATA_API
+#include "stb_vorbis.c"

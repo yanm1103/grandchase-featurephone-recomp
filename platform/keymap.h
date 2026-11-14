@@ -26,7 +26,7 @@ static Action g_act[] = {
 #define NACT ((int)(sizeof g_act / sizeof g_act[0]))
 
 /* teclas da propria plataforma: nao podem ser ligadas a acoes do jogo */
-static int key_reserved(SDL_Keycode k) { return k == SDLK_F1 || k == SDLK_F5 || k == SDLK_F9 || k == SDLK_F11; }
+static int key_reserved(SDL_Keycode k) { return k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F5 || k == SDLK_F9 || k == SDLK_F11; }
 static void act_parse(Action *a, const char *list) {
     a->k[0] = a->k[1] = a->k[2] = SDLK_UNKNOWN;
     char buf[160]; SDL_strlcpy(buf, list, sizeof buf); int n = 0;
@@ -99,11 +99,13 @@ static void help_draw(SDL_Renderer *r) {
     y += 10; SDL_SetRenderDrawColor(r, 150, 150, 150, 255);
     SDL_RenderDebugText(r, 12, y, "Teclas 2 4 6 8 tambem andam e 5 ataca."); y += 11;
     SDL_RenderDebugText(r, 12, y, "Dois toques na direcao = correr."); y += 11;
+    SDL_RenderDebugText(r, 12, y, "Duas direcoes juntas = anda na diagonal."); y += 11;
     SDL_RenderDebugText(r, 12, y, "Segurar uma direcao enquanto ataca ou"); y += 11;
     SDL_RenderDebugText(r, 12, y, "usa habilidade continua andando."); y += 11;
     SDL_RenderDebugText(r, 12, y, "Arquivo: controles.ini (pasta de saves)"); y += 16;
     SDL_SetRenderDrawColor(r, 255, 220, 90, 255); SDL_RenderDebugText(r, 12, y, "F5 = salvar ESTADO (foto do jogo, em"); y += 11;
-    SDL_RenderDebugText(r, 12, y, "qualquer lugar)    F9 = carregar estado.");
+    SDL_RenderDebugText(r, 12, y, "qualquer lugar)    F9 = carregar estado."); y += 11;
+    SDL_RenderDebugText(r, 12, y, "F2 = filtro de imagem (LCD, CRT, xBRZ...)");
     SDL_SetRenderLogicalPresentation(r, 240, 320, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
 }
 /* devolve 1 se consumiu a tecla */
