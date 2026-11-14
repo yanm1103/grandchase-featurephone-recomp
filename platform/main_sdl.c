@@ -126,7 +126,9 @@ static int state_file(int save, const char *path, int quiet, const char *ok_msg)
  * (ou quando stamp.txt muda) copia tudo para o armazenamento interno do app. A pasta de saves nunca e sobrescrita. */
 static void android_extract(const char *base) {
     char stampf[600]; SDL_snprintf(stampf, sizeof stampf, "%s/stamp.txt", base);
-    size_t n1 = 0, n2 = 0; char *a = SDL_LoadFile("stamp.txt", &n1), *b = SDL_LoadFile(stampf, &n2);
+    /* ATENCAO: no Android o SDL_LoadFile de caminho relativo tenta ANTES o armazenamento interno (<files>/<rel>) e so depois o APK. Por isso o carimbo do APK tem nome proprio
+     * (apkstamp.txt, nunca existe no interno) e cada arquivo interno e apagado antes de ser lido de novo dos assets; senao a atualizacao copiava os arquivos velhos por cima deles. */
+    size_t n1 = 0, n2 = 0; char *a = SDL_LoadFile("apkstamp.txt", &n1), *b = SDL_LoadFile(stampf, &n2);
     int same = a && b && n1 == n2 && !memcmp(a, b, n1); SDL_free(b);
     if (same) { SDL_free(a); return; }
     size_t nl = 0; char *list = SDL_LoadFile("files.txt", &nl); if (!list) { SDL_free(a); return; }
@@ -135,8 +137,9 @@ static void android_extract(const char *base) {
     while (p < end) {
         char *e = p; while (e < end && *e != '\n' && *e != '\r') e++;
         char rel[300]; size_t L = (size_t)(e - p); if (L > 0 && L < sizeof rel) {
-            memcpy(rel, p, L); rel[L] = 0; size_t len = 0; void *d = SDL_LoadFile(rel, &len);
-            if (d) { char dst[900], dir[900]; SDL_snprintf(dst, sizeof dst, "%s/%s", base, rel); SDL_strlcpy(dir, dst, sizeof dir); char *sl = SDL_strrchr(dir, '/'); if (sl) { *sl = 0; SDL_CreateDirectory(dir); } SDL_SaveFile(dst, d, len); SDL_free(d); }
+            memcpy(rel, p, L); rel[L] = 0; size_t len = 0; char dst[900], dir[900]; SDL_snprintf(dst, sizeof dst, "%s/%s", base, rel); SDL_RemovePath(dst);
+            void *d = SDL_LoadFile(rel, &len);
+            if (d) { SDL_strlcpy(dir, dst, sizeof dir); char *sl = SDL_strrchr(dir, '/'); if (sl) { *sl = 0; SDL_CreateDirectory(dir); } SDL_SaveFile(dst, d, len); SDL_free(d); }
         }
         while (e < end && (*e == '\n' || *e == '\r')) e++;
         p = e; done++;

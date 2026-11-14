@@ -31,3 +31,11 @@ o portao de verificacao agora confere so o **codigo** do `.text` (ate 0x40fc8), 
 
 ## Decisoes de nomes
 `work/GLOSSARIO.md` (autoridade) e `work/npc_pt.json` (titulos/nomes de NPC). Grafias do BR oficial: Gaicoz, Cazeaje, Kamiki, Gadosen, Ninkoro, Floresta dos Desafios... Nomes proprios sao transliterados, nunca traduzidos (Iron, Windy, Queenie...).
+
+## Grind das missoes e mineracao (2026-11-14)
+`grind.py` (chamado por `build.py`) reduz as missoes de matar/coletar com contador > 3 para `max(3, ceil(n/3))` (90 missoes): byte +0x0f do registro de `scp_quest.scp`,
+opcode 0x22 (remove item) dos scripts de entrega, descricao da missao e falas que citam o numero (n23 tem "Vinte"/"Dez" por extenso). Nao mexe nas missoes de combinar item
+(Onyx da Luz/Trevas, Missao Importante?): o custo delas vem da receita de combinacao no codigo.
+`runtime/patch.c` (`hook_resolve_chest`, 0xfcb4): cada minerada solta 4-5 itens (mesma tabela/faixa da barra; faixa -1 continua sem nada) e, com missao de mineracao ativa
+(Bijou 0x1f0001, Cristal 0x1f0064, Fragmento de Rubi 0x1e0040 e 0x1f002c), os primeiros itens sao os da missao.
+Atencao: `auto.snap`/`estado.snap` guardam a tabela de missoes antiga na memoria; depois de mudar dados, apague-os (ou o jogo retoma com os numeros velhos).

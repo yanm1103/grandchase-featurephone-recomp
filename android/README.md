@@ -6,7 +6,7 @@ icone (`platform/icon_src_61.png`), javac + d8 (fontes Java do SDL + `GC1Activit
 Ferramentas: `C:\Users\TwistZero\tools\android-sdk` (platform 34, build-tools 35.0.1 - o d8 do 34.0.0 quebra com uma classe do SDL, NDK 27.2, cmake 3.22.1, emulator, imagem x86_64 API 34), JDK 21. AVD `gc1` em `C:\Users\TwistZero\tools\android-avd`.
 
 ## Como o app funciona
-- Na primeira execucao copia `assets/game`, `assets/audio` (lista em `files.txt`; `stamp.txt` decide se recopia) para o armazenamento interno (`files/game`, `files/audio`); os saves ficam em `files/save` e nunca sao sobrescritos.
+- Na primeira execucao copia `assets/game`, `assets/audio` (lista em `files.txt`; `apkstamp.txt` no APK x `stamp.txt` interno decide se recopia; cuidado: SDL_LoadFile relativo olha o armazenamento interno antes do APK) para o armazenamento interno (`files/game`, `files/audio`); os saves ficam em `files/save` e nunca sao sobrescritos.
 - Controles de toque (`platform/touch.h`): D-pad, OK, MENU (= CLR/voltar), MINIMAPA, MAPA, SALVAR (popup do jogo), atalhos 1 3 7 9 * 0 #. O botao Voltar do Android = CLR. Teclado fisico/emulador tambem funciona (`keymap.h`).
   No PC: `gc1.exe --touch` mostra o mesmo layout (o mouse vira dedo); `--selftest-shot arq.bmp` salva uma captura.
 - Save state: no Android, F5/F9 de teclado fisico (`adb shell input keyevent KEYCODE_F5` / `KEYCODE_F9`); o arquivo e `files/save/estado.snap` e e o mesmo formato do PC (um estado gerado no PC carrega no Android).

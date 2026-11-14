@@ -150,6 +150,55 @@ static uint32_t hook_text_measure(Cpu *c) {
     *c = saved; c->r[0] = w - (uint32_t)n * LD8(G_ADV_SCALE); return lr;
 }
 
+/* ---------------- mineracao (jazidas, objeto 0xe6) ----------------
+ * resolve_chest_minigame (0xfcb4) sorteava UM item por minerada (roll_chest_loot). Agora a minerada solta 4 ou 5 itens (cada um sorteado na mesma tabela
+ * e na mesma faixa da barra) e, se houver uma missao que exige item de mineracao em andamento, os primeiros itens sao os da missao
+ * (Vamos Minerar: Bijou; mineracao de Cristal; Material Magico / Chama Apagada: Fragmento de Rubi). Cursor fora da barra boa (faixa -1) continua nao soltando nada. */
+#define A_RESOLVE_CHEST 0xfcb4u
+#define A_ROLL_CHEST    0xfa4cu
+#define A_SPAWN_DROP    0xfb2cu
+#define A_CLOSE_CHEST   0xfc54u
+#define A_RAND_RANGE    0x36da8u
+#define G_CHEST_BAR     0x1500054u
+#define G_PLAYER_ENT    0x1634268u
+#define G_CUR_QUEST     0x162b6e4u
+#define G_ACT_QUESTS    0x162a9fcu
+#define G_ACT_QCOUNT    0x162b794u
+static const struct { uint32_t quest, item; } MINE_QUESTS[] = {
+    {0x1f0001u, 0xe0cu},    /* Vamos Minerar (secundaria 1): 1 Bijou */
+    {0x1f0064u, 0xe0au},    /* secundaria 100: 1 Cristal */
+    {0x1e0040u, 0xe13u},    /* Material Magico (principal 64): 3 Fragmentos de Rubi */
+    {0x1f002cu, 0xe13u},    /* Chama Apagada (secundaria 44): 2 Fragmentos de Rubi */
+};
+static int quest_active(uint32_t id) {
+    if (LD32(G_CUR_QUEST) == id) return 1;
+    uint32_t n = LD8(G_ACT_QCOUNT); if (n > 50) n = 50;
+    for (uint32_t i = 0; i < n; i++) if (LD32(G_ACT_QUESTS + 4 * i) == id) return 1;
+    return 0;
+}
+static uint32_t hook_resolve_chest(Cpu *c) {
+    Cpu saved = *c; uint32_t lr = c->r[14];
+    uint32_t pos = LD16(G_CHEST_BAR); int band;                    /* mesma conversao barra -> faixa do original */
+    if (pos < 0x2a) band = -1;
+    else if (pos < 0x3c) band = 0;
+    else if (pos > 0x4a && pos < 0x4f) band = 2;
+    else if (pos > 0x55) band = (pos > 0x5e) ? -1 : 0;
+    else band = 1;
+    if (band >= 0) {
+        uint32_t ent = LD32(G_PLAYER_ENT); int px = (int16_t)LD16(ent + 0x14), py = (int16_t)LD16(ent + 0x16);
+        static const int DX[5] = {0, -16, 16, 0, 0}, DY[5] = {0, 0, 0, 16, -16};
+        uint32_t want[4]; int nw = 0;
+        for (unsigned i = 0; i < sizeof MINE_QUESTS / sizeof *MINE_QUESTS; i++) if (quest_active(MINE_QUESTS[i].quest)) want[nw++] = MINE_QUESTS[i].item;
+        int drops = 4 + (int)gcall(A_RAND_RANGE, 2, 0, 1, 0, 0, 0, 0);
+        for (int i = 0; i < drops; i++) {
+            uint32_t item = (i < nw) ? want[i] : gcall(A_ROLL_CHEST, 1, (uint32_t)band, 0, 0, 0, 0, 0);
+            if (item) gcall(A_SPAWN_DROP, 3, item, (uint32_t)(px + DX[i]), (uint32_t)(py + DY[i]), 0, 0, 0);
+        }
+    }
+    gcall(A_CLOSE_CHEST, 0, 0, 0, 0, 0, 0, 0);
+    *c = saved; return lr;
+}
+
 static BlockFn install(uint32_t addr, BlockFn fn) { uint32_t i = (addr - TEXT_BASE) >> 1; BlockFn o = NULL; if (i < gc_text_halfwords && gc_blocks[i]) { o = gc_blocks[i]; gc_blocks[i] = fn; } return o; }
 void gc1_patches_reset(void) { g_acc_img[3] = 0; }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
 void gc1_patches_install(void) {
@@ -158,4 +207,5 @@ void gc1_patches_install(void) {
     install(A_TEXT_WRAPPED, hook_text_draw_wrapped);
     orig_glyph = install(A_TEXT_DRAW_GLYPH, hook_text_draw_glyph);
     orig_measure = install(A_TEXT_MEASURE, hook_text_measure);
+    install(A_RESOLVE_CHEST, hook_resolve_chest);
 }

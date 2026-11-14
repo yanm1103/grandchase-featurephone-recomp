@@ -18,7 +18,7 @@ done
 # 2. assets (jogo + audio + lista de arquivos + carimbo de versao)
 rm -rf $B/assets; mkdir -p $B/assets
 cp -r "$SRC_ASSETS" $B/assets/game; cp -r "$SRC_AUDIO" $B/assets/audio
-(cd $B/assets && find game audio -type f | sort > files.txt && date +%s > stamp.txt)
+(cd $B/assets && find game audio -type f | sort > files.txt && date +%s > apkstamp.txt)
 # 3. recursos (icone)
 rm -rf $B/res $B/rescompiled; mkdir -p $B/res/mipmap-xxxhdpi $B/rescompiled
 python -I -c "

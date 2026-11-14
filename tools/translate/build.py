@@ -23,6 +23,8 @@ for f_ in sorted(glob.glob(os.path.join(W, 'acentos', 'out', '*.json'))):      #
     tr.update(json.load(open(f_, encoding='utf8')))
 if os.environ.get('GC1_EXTRA'):      # texto extra (ex.: pilotos de acentuacao) por cima de tudo
     tr.update(json.load(open(os.environ['GC1_EXTRA'], encoding='utf8')))
+import grind
+grind_changed = grind.edit_texts(tr)           # contagens das missoes de matar/coletar reduzidas (descricoes e falas); a parte binaria vem no fim
 npc = json.load(open(os.path.join(W, 'npc_pt.json'), encoding='utf8'))
 for c in cat:
     if c['kind'] == 'cd' and c['table'] == 'npc': tr[c['id']] = npc[str(c['rec'])][0 if c['field'] == 'title' else 1]
@@ -135,6 +137,9 @@ for a, sb, cap in ui.slots(bytearray(text)):
     txt = enc(expected[uid]); assert len(txt) + 1 <= cap, (uid, len(txt), cap)
     p = soff + a - ui.TEXT_BASE; mod[p:p + cap] = txt + b'\0' * (cap - len(txt))
 wr('binary.mod', bytes(mod))
+
+# 6. grind das missoes: contagens na tabela e nos scripts de entrega (os textos ja foram trocados em grind.edit_texts)
+print('grind: %d textos alterados; registros/remocoes de item: %s' % (len(grind_changed), grind.patch_binary(OUT)))
 
 # ---------------- verificacao por releitura ----------------
 def reread():
