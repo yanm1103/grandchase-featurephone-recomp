@@ -32,6 +32,7 @@ void     gc1_paint(void);                                         /* paintClet *
 void     gc1_key(int key, int pressed);                           /* handleCletEvent(502/503, key, 0) */
 void     gc1_input_enable(int on);                                /* liga a camada de entrada inteligente (ver hle.c) */
 void     gc1_input_key(int key, int pressed);                     /* use no lugar de gc1_key nas plataformas */
+int      gc1_diag_secondary(int primary);                         /* direcao perpendicular segurada (andar na diagonal), ou -1 */
 void     gc1_patches_install(void);                               /* correcoes do motor (runtime/patch.c); chamado por gc1_boot */
 void     gc1_patches_reset(void);                                 /* chamado apos carregar um save state */
 void     gc1_wraplog(FILE *f);                                    /* diagnostico: grava os textos que o original cortaria no meio de uma palavra */

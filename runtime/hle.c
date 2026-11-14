@@ -539,6 +539,16 @@ static void smart_tick(void) {
     uint32_t pe = LD32(A_PLAYER);
     if (LD8(A_MOVE_MODE) == 0 && LD8(pe + 8) == 0) repress(g_held[g_nheld - 1]);
 }
+/* Diagonal: devolve a direcao (0 baixo, 1 direita, 2 esquerda, 3 cima) de uma tecla segurada PERPENDICULAR a `primary` (a mais recente), ou -1.
+ * So vale se a direcao `primary` tambem esta segurada. Usado pelo gancho de andar (patch.c) para somar um passo no outro eixo. */
+int gc1_diag_secondary(int primary) {
+    if (!g_smart || g_nheld < 2) return -1;
+    int has = 0; for (int i = 0; i < g_nheld; i++) if (dir_of(g_held[i]) == primary) has = 1;
+    if (!has) return -1;
+    int pv = (primary == 0 || primary == 3);
+    for (int i = g_nheld - 1; i >= 0; i--) { int d = dir_of(g_held[i]); if (d >= 0 && (d == 0 || d == 3) != pv) return d; }
+    return -1;
+}
 void gc1_input_enable(int on) { g_smart = on; g_nheld = 0; }
 void gc1_input_key(int key, int pressed) {
     if (!g_smart) { gc1_key(key, pressed); return; }

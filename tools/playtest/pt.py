@@ -76,7 +76,10 @@ def main():
     frames = (tend + 1500) // 25 + 50
     cmd = [a.exe, a.res, sv, '--frames', str(frames), '--keys', kf, '--state', os.path.join(a.out, 'estado.txt'), '--dump', os.path.join(a.out, 'q_'), '--dump-every', '0'] + ([] if a.raw else ['--smart-from', str(tboot)]) + (['--load', fromstate] if fromstate else [])
     if shots: cmd += ['--shots', ','.join(str(t) for t, _ in shots)]
-    r = subprocess.run(cmd, capture_output=True, text=True); print(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    dbg = [l for l in r.stderr.splitlines() if l.startswith('DIAGDBG')]
+    if dbg: print(f'  DIAGDBG: {len(dbg)} quadros com o jogador em cima de parede; primeiro: {dbg[0]}')
+    print(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout)
     for t, nm in shots:
         src = os.path.join(a.out, f'q_t{t:07d}.ppm')
         if os.path.exists(src): subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'tools/translate/ppm2png.py'), src, os.path.join(a.out, nm + '.png'), '3']); os.remove(src)

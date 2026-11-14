@@ -1,0 +1,18 @@
+# segurar direita + cima: anda nos dois eixos (x sobe, y diminui); soltar cima continua andando para a direita; soltar tudo para
+# (a direcao do rosto nao e conferida: o jogo escolhe sozinho e, na parede, desvia de canto de forma aleatoria)
+from cidade
+wait 300
+press right
+wait 200
+expect mv == 1
+press up
+wait 500
+expect mv == 1
+expect x > 330
+expect y < 390
+release up
+wait 150
+expect mv == 1
+release right
+wait 300
+expect mv == 0

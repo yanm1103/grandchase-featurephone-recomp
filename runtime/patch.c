@@ -20,7 +20,7 @@
 #define NACC 24
 
 static FILE *g_wraplog; static int g_patched;
-static BlockFn orig_glyph, orig_measure;
+static BlockFn orig_glyph, orig_measure, orig_walk;
 void gc1_wraplog(FILE *f) { g_wraplog = f; }
 
 static uint32_t thumb_bit(uint32_t a) { uint32_t i = (a - TEXT_BASE) >> 1; return (i < gc_text_halfwords && gc_mode[i] == 1) ? 1u : 0u; }
@@ -199,6 +199,65 @@ static uint32_t hook_resolve_chest(Cpu *c) {
     *c = saved; return lr;
 }
 
+
+/* ---------------- andar na diagonal ----------------
+ * O jogo so tem 4 direcoes (um sprite por direcao), entao a diagonal e so de movimento: o rosto continua na direcao principal (a ultima apertada) e,
+ * com uma direcao perpendicular segurada, o jogador tambem anda no outro eixo. player_update_walk_anim (0x23fe4) anda 8 px (5 em tile lento) por quadro
+ * no eixo principal; aqui, num ciclo de 3 quadros: quadro 0 = os dois eixos, 1 = so o principal, 2 = so o secundario (2 passos por eixo a cada 3 quadros:
+ * velocidade ~94% da reta em vez de 141%, e sempre multiplo de 8 px, como o jogo espera para o alinhamento das caminhadas de cena).
+ * A colisao do eixo secundario repete o que o jogo faz no principal: tile 8 px a frente (get_tile_type_ahead; 1 e 0xb = parede), monstros
+ * (monster_blocks_player_move) e minerio/bau (object_blocks_player_move + can_open_chest). So anda (modo 1), nunca correndo, e so livre (acao 0). GC1_NODIAG=1 desliga. */
+#define A_WALK_ANIM     0x23fe4u
+#define A_TILE_AHEAD    0xce10u
+#define A_MON_BLOCKS    0xc31cu
+#define A_OBJ_BLOCKS    0xc50cu
+#define A_CAN_OPEN      0xc5c0u
+#define G_MOVE_MODE     0x1634b40u
+#define G_ENT_LIST      0x1634bf8u
+#define G_ENT_COUNT     0x150004cu
+#define G_SLOW_TILE     0x150006au
+static int g_nodiag, g_diag_tick, g_diagdbg;
+static int diag_free(uint32_t ent, int sec) {
+    int x = (int16_t)LD16(ent + 0x14), y = (int16_t)LD16(ent + 0x16);
+    uint32_t t = gcall(A_TILE_AHEAD, 2, (uint32_t)x, (uint32_t)y, 0, 0, 0, 0) & 0xff;
+    if (t == 1 || t == 0xb) return 0;
+    int n = (int)LD16(G_ENT_COUNT); if (n > 0x226) n = 0x226;
+    for (int i = 0; i < n; i++) {
+        uint32_t e = LD32(G_ENT_LIST + 4u * (uint32_t)i); if (!e) continue;
+        uint32_t kind = LD8(e + 3);
+        if (kind == 1) { if (LD8(e + 5) != 4 && (gcall(A_MON_BLOCKS, 2, e, 1, 0, 0, 0, 0) & 0xff)) return 0; }
+        else if (kind == 0 && LD8(e + 2) == 0xe6) { if ((gcall(A_OBJ_BLOCKS, 2, e, 1, 0, 0, 0, 0) & 0xff) && (gcall(A_CAN_OPEN, 1, (uint32_t)i, 0, 0, 0, 0, 0) & 0xff)) return 0; }
+    }
+    (void)sec; return 1;
+}
+static uint32_t hook_walk_anim(Cpu *c) {
+    Cpu saved = *c; uint32_t lr = c->r[14];
+    uint32_t ent = LD32(G_PLAYER_ENT); int sec = -1, p = 0;
+    if (ent && !g_nodiag && LD8(G_MOVE_MODE) == 1 && LD8(ent + 8) == 0 && LD8(ent + 5) != 9) { p = (int)LD8(ent + 1); if (p < 4) sec = gc1_diag_secondary(p); }
+    uint32_t i0 = (A_WALK_ANIM - TEXT_BASE) >> 1; BlockFn hook = gc_blocks[i0]; gc_blocks[i0] = orig_walk;
+    if (sec < 0) { g_diag_tick = 0; gcall(A_WALK_ANIM, 0, 0, 0, 0, 0, 0, 0); gc_blocks[i0] = hook; *c = saved; return lr; }
+    int phase = g_diag_tick % 3; g_diag_tick++;
+    uint32_t fl = LD32(ent + 0x28) + 0xau + (uint32_t)p, keep = LD8(fl);
+    if (phase == 2) ST8(fl, 0);                                    /* quadro so do eixo secundario: o principal nao anda */
+    gcall(A_WALK_ANIM, 0, 0, 0, 0, 0, 0, 0); gc_blocks[i0] = hook;
+    if (phase == 2) ST8(fl, keep);
+    if (phase != 1) {
+        ST8(ent + 1, (uint32_t)sec);                               /* as rotinas de colisao do jogo olham a direcao do jogador */
+        if (diag_free(ent, sec)) {
+            int step = LD8(G_SLOW_TILE) ? 5 : 8;
+            if (sec == 0) ST16(ent + 0x16, LD16(ent + 0x16) + (uint32_t)step); else if (sec == 3) ST16(ent + 0x16, LD16(ent + 0x16) - (uint32_t)step);
+            else if (sec == 1) ST16(ent + 0x14, LD16(ent + 0x14) + (uint32_t)step); else ST16(ent + 0x14, LD16(ent + 0x14) - (uint32_t)step);
+        }
+        ST8(ent + 1, (uint32_t)p);
+    }
+    if (g_diagdbg) {                                               /* depuracao: o jogador nunca deveria ficar em cima de parede */
+        uint32_t cm = LD32(0x1633f44u), tl = LD32(cm + 0xc); int w = (int)LD8(cm + 8);
+        int tx = (int16_t)LD16(ent + 0x14) >> 4, ty = (int16_t)LD16(ent + 0x16) >> 4; uint32_t t = LD8(tl + 4u * (uint32_t)(ty * w + tx) + 2) & 0x1f;
+        if (t == 1 || t == 0xb) fprintf(stderr, "DIAGDBG parede x=%d y=%d tile=%d,%d tipo=%u prim=%d sec=%d\n", (int)(int16_t)LD16(ent + 0x14), (int)(int16_t)LD16(ent + 0x16), tx, ty, t, p, sec);
+    }
+    *c = saved; return lr;
+}
+
 static BlockFn install(uint32_t addr, BlockFn fn) { uint32_t i = (addr - TEXT_BASE) >> 1; BlockFn o = NULL; if (i < gc_text_halfwords && gc_blocks[i]) { o = gc_blocks[i]; gc_blocks[i] = fn; } return o; }
 void gc1_patches_reset(void) { g_acc_img[3] = 0; }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
 void gc1_patches_install(void) {
@@ -208,4 +267,6 @@ void gc1_patches_install(void) {
     orig_glyph = install(A_TEXT_DRAW_GLYPH, hook_text_draw_glyph);
     orig_measure = install(A_TEXT_MEASURE, hook_text_measure);
     install(A_RESOLVE_CHEST, hook_resolve_chest);
+    g_nodiag = getenv("GC1_NODIAG") != NULL; g_diagdbg = getenv("GC1_DIAGDBG") != NULL;
+    orig_walk = install(A_WALK_ANIM, hook_walk_anim);
 }
