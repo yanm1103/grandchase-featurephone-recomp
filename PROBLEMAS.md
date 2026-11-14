@@ -22,3 +22,7 @@ Formato: [estado] titulo - causa - onde foi tratado / teste que cobre.
 - [ ] Traducao PT-BR (retraduzida do coreano) nao foi revisada por humano; telas nao conferidas: lojas, inventario, habilidades, HUD de combate, finais.
 - [~] Port Android: APK funcionando no emulador (boot, toque, D-pad, ataque, save state carregado) - ver `android/README.md`. Falta: testar num celular real, ouvir o audio, tablet/paisagem, auto-save ao pausar, tela de ajuda no toque, APK de release (hoje debuggable, chave de debug).
 - [ ] `build.sh all`/`ref` nao liga (falta `gc1_cov_dump` no backend unicorn) - ja estava assim antes; `headless` e `sdl` funcionam.
+- [ ] **Reduzir o tamanho do audio** - `build/out/audio` tem ~76 MB de WAV sem compressao (e vai igual dentro do APK de ~105 MB; o original era MIDI/MMF).
+  Ideia: converter para OGG/Opus e decodificar ao carregar. Cuidado: `runtime/audio_policy.c` identifica o clipe pelo hash do conteudo (`ap_fnv64`), entao
+  o hash tem que continuar sendo calculado sobre os dados originais (ou mapear hash -> arquivo convertido). Fazer depois de confirmar que o audio funciona no celular.
+  Extra: APK so com arm64-v8a (sem x86_64, que e so do emulador) tira ~11 MB.

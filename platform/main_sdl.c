@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
     SDL_CreateDirectory(save);
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) { SDL_Log("SDL_Init: %s", SDL_GetError()); return 1; }
 #ifdef __ANDROID__
-    g_touch_ui = 1; scale = 1; full = 1;
+    g_touch_ui = 1; scale = 1; full = 0;     /* janela normal: barra de status e de navegacao do Android continuam visiveis */
     static char rbuf[600], sbuf[600], abuf[600]; const char *abase = SDL_GetAndroidInternalStoragePath();
     SDL_snprintf(rbuf, sizeof rbuf, "%s/game", abase); SDL_snprintf(sbuf, sizeof sbuf, "%s/save", abase); SDL_snprintf(abuf, sizeof abuf, "%s/audio", abase);
     res = rbuf; save = sbuf; g_audio_dir = abuf; SDL_CreateDirectory(save);

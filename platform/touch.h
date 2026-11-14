@@ -14,7 +14,7 @@ static Finger g_fing[10];
 static void touch_layout(void) {
     SDL_GetRenderOutputSize(ren, &g_scr_w, &g_scr_h);
     float W = (float)g_scr_w, H = (float)g_scr_h;
-    int s = (int)SDL_floorf(SDL_min(W / 240.0f, H * 0.56f / 320.0f)); if (s < 1) s = 1;
+    int s = (int)SDL_floorf(SDL_min(W / 240.0f, H * 0.60f / 320.0f)); if (s < 1) s = 1;
     g_game_rect = (SDL_FRect){ SDL_floorf((W - 240.0f * s) / 2), 0, 240.0f * s, 320.0f * s };
     float top = g_game_rect.h + 6, ah = H - top;
     { static int logged; if (!logged) { logged = 1; SDL_Log("gc1 layout: saida %dx%d, escala do jogo %d", g_scr_w, g_scr_h, s); } }
