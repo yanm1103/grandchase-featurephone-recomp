@@ -1,0 +1,57 @@
+# servidor falso: morre sem pergaminho, escolhe Renascer -> Sim e o jogo compra um (100 won, de graca) e revive no lugar; o contador de wons sobe 100
+from torre1
+wait 500
+poke 0x162bf10 2 0
+poke 0x162bf20 2 0
+poke 0x162bf30 2 0
+poke 0x162bf40 2 0
+poke 0x162bf50 2 0
+poke 0x162bf60 2 0
+poke 0x162bf70 2 0
+poke 0x162bf80 2 0
+poke 0x162bf90 2 0
+poke 0x162bfa0 2 0
+poke 0x162bfb0 2 0
+poke 0x162bfc0 2 0
+poke 0x162bfd0 2 0
+poke 0x162bfe0 2 0
+poke 0x162bff0 2 0
+poke 0x162c000 2 0
+poke 0x162c010 2 0
+poke 0x162c020 2 0
+poke 0x162c030 2 0
+poke 0x162c040 2 0
+poke 0x162c050 2 0
+poke 0x162c060 2 0
+poke 0x162c070 2 0
+poke 0x162c080 2 0
+poke 0x162c090 2 0
+poke 0x162c0a0 2 0
+poke 0x162c0b0 2 0
+poke 0x162c0c0 2 0
+poke 0x162c0d0 2 0
+poke 0x162c0e0 2 0
+poke 0x162c0f0 2 0
+poke 0x162c100 2 0
+poke 0x162c110 2 0
+poke 0x162c120 2 0
+poke 0x162c130 2 0
+poke 0x162c140 2 0
+poke 0x162c150 2 0
+poke 0x162c160 2 0
+poke 0x162c170 2 0
+poke 0x162c180 2 0
+poke 0x162baa4 2 1
+poke 0x163615a 1 1
+poke 0x16343f2 1 1
+poke 0x1500070 1 0
+poke 0x1633f5c 1 0
+wait 600
+tap ok
+wait 400
+tap left
+wait 300
+tap ok
+wait 2500
+expect dead == 0
+expect online won == 100

@@ -3,6 +3,10 @@
 Investigação somente leitura (nenhum arquivo do recomp/decomp foi alterado; nada foi compilado ou executado). Data: 2026-11-14.
 Legenda: **[FATO]** = verificado no código decompilado ou nos dados do jogo (endereço/arquivo citado). **[HIPÓTESE]** = inferência, não comprovada.
 
+## STATUS (2026-11-14): servidor falso implementado
+Decisoes do usuario: pergaminho e chaves **de graca**, mas somando os wons "que teria gasto na epoca" numa tela Sobre (tambem mostra medalhas); cupons e medalhas falsos (codigo aleatorio) **junto com os itens**; ranking com jogadores aleatorios.
+Implementado em `runtime/netsim.h` + sockets do `runtime/hle.c` (resposta 0x65/0x69/0x6b/0xc9; o resto -> "Servico online encerrado."), tela Sobre em `platform/keymap.h` (`about_draw`) e `platform/touch.h` (4o botao da gaveta). Detalhes e o que falta: `PROBLEMAS.md` (item "Rede / itens..."). P3 feito: Dennis virou loja local (curas/receitas sem fonte, bilhetes de chefe e pacotes de armadura; ver PROBLEMAS.md). Ainda em aberto daqui: os itens de rosto/aneis/colares/asas/pets/pecas de set sem fonte e o texto de cupons da tela de abertura.
+
 ## 0. Resumo (leia só isto se tiver pouco tempo)
 
 1. O cliente fala um protocolo binário próprio sobre TCP com `210.217.196.90:10022` (string em 0x42858, porta 0x2726). Há **uma única porta de entrada para o "modo online" completo (mercado de jogadores + correio)**: o NPC **Dennis (NPC 56, "Mercador Viajante"/"특별 상인")**, presente nas 5 cidades (mapas 1, 3, 6, 7, 8), opção "Conectar à rede" (script tipo 9, `n56.scp`). Fora isso, só 3 usos de rede: **comprar Pergaminho de Ressurreição** (menu de morte), **abrir Baú do Tesouro com chave paga** (inventário) e **menu principal > Comunidade** (ranking, cupons, medalhas).

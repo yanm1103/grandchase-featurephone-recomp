@@ -35,6 +35,7 @@ def parse(path):
         elif c == 'tap': ev.append((t, KEYS[a[1]], 'p')); t += int(a[2]) if len(a) > 2 else 80; ev.append((t, KEYS[a[1]], 'r'))
         elif c == 'hold': ev.append((t, KEYS[a[1]], 'p')); t += int(a[2]); ev.append((t, KEYS[a[1]], 'r'))
         elif c == 'poke': ev.append((t, 'P', f'{int(a[1], 0):x} {int(a[2])} {int(a[3], 0)}'))     # poke <endereco> <bytes> <valor>
+        elif c == 'call': ev.append((t, 'C', f'{int(a[1], 0):x} {int(a[2], 0)} {int(a[3], 0) if len(a) > 3 else 0}'))     # call <endereco_thumb> <a0> [a1]: chama uma funcao do jogo
         elif c == 'teleport':      # teleport <mapa> <x> <y> <dir>: pede a transicao de mapa do proprio jogo
             for ad, sz, v in ((0x162c442, 1, a[1]), (0x162c444, 2, a[2]), (0x162c446, 2, a[3]), (0x162c448, 1, a[4]), (0x162c440, 1, 1)): ev.append((t, 'P', f'{ad:x} {sz} {int(str(v), 0)}'))
             t += 400
@@ -90,6 +91,11 @@ def main():
             v = sum(1 for r in rows if 'audio' in r and t0 <= r['t'] <= t1 and r['audio'].startswith(kinds[kind]))
             ok = eval(f'{v}{op}{n}'); print(('ok   ' if ok else 'FALHA'), f'contagem {kind} em [{t0},{t1}] {op} {n} (valor={v})', f'linha {ln}'); fails += not ok; continue
         t, e, ln = item
+        if e.startswith('online '):      # expect online won|medals|coupons <op> <n>: confere o <saves>/online.sav do servidor falso (runtime/netsim.h) ao fim da execucao
+            _, campo, op, n = e.split(); import struct
+            try: d = open(os.path.join(sv, 'online.sav'), 'rb').read(); v = dict(zip(('won', 'medals', 'coupons'), (struct.unpack('<5I', d[:20])[1], struct.unpack('<5I', d[:20])[2], struct.unpack('<5I', d[:20])[3])))[campo]
+            except OSError: v = 0
+            ok = eval(f'{v}{op}{n}'); print(('ok   ' if ok else 'FALHA'), 'online', campo, op, n, f'(valor={v})', f'linha {ln}'); fails += not ok; continue
         s = state_at(rows, t); m = re.match(r'(\w+)\s*(==|!=|>=|<=|>|<)\s*(-?\d+)', e)
         v = s.get(m.group(1)) if s else None; ok = v is not None and eval(f'{v}{m.group(2)}{m.group(3)}')
         print(('ok   ' if ok else 'FALHA'), f't={t}', e, f'(valor={v})', f'linha {ln}'); fails += not ok

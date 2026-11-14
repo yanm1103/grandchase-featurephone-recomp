@@ -399,11 +399,30 @@ H(Vibrator)  { host_vibrate((int32_t)c->r[0], (int32_t)c->r[1]); return 0; }
 H(SetMuteState) { return 0; }
 H(BackLight) { return 0; }
 H(Unk514) { return 0; }
-/* --- rede: o servico original nao existe mais; todas as chamadas falham como no WIE --- */
-H(Connect) { timer_add(0, c->r[0], c->r[1], 0xffffffffu, g_now + 1); return 0; }
+/* --- rede: o servico original nao existe mais; um servidor falso responde localmente (runtime/netsim.h).
+ * Com GC1_NONET=1 todas as chamadas falham como no WIE. --- */
+#include <time.h>
+#include "netsim.h"
+static uint8_t ns_req[2048], ns_resp[1024]; static int ns_reqn, ns_respn, ns_respoff;
+H(Connect) { timer_add(0, c->r[0], c->r[1], ns_nonet ? 0xffffffffu : 0, g_now + 1); return 0; }
 H(NetClose) { return 0; }
-H(UnkSocket) { return (uint32_t)-1; }
+H(UnkSocket) { return ns_nonet ? (uint32_t)-1 : 5; }
 H(NetFail) { return (uint32_t)-1; }
+H(SocketConnect) { if (ns_nonet) return (uint32_t)-1; ns_reqn = ns_respn = ns_respoff = 0; timer_add(0, c->r[3], 0, c->r[0], g_now + 1); return 0; }
+H(SocketWrite) {
+    int32_t len = (int32_t)c->r[2]; if (ns_nonet) return (uint32_t)-1; if (len < 0) return (uint32_t)-1;
+    int take = len; if (ns_reqn + take > (int)sizeof ns_req) take = (int)sizeof ns_req - ns_reqn;
+    memcpy(ns_req + ns_reqn, G + c->r[1], (size_t)take); ns_reqn += take;
+    if (ns_reqn >= 4 && ns_reqn >= (ns_req[0] | (ns_req[1] << 8)) + 4) { ns_respn = ns_respond(ns_req, ns_reqn, ns_resp); ns_respoff = 0; ns_reqn = 0; }
+    return (uint32_t)len;
+}
+H(SocketRead) {
+    if (ns_nonet) return (uint32_t)-1;
+    int left = ns_respn - ns_respoff; if (left <= 0) return (uint32_t)-0x13;
+    int n = (int)c->r[2] < left ? (int)c->r[2] : left; memcpy(G + c->r[1], ns_resp + ns_respoff, (size_t)n); ns_respoff += n; return (uint32_t)n;
+}
+H(SocketClose) { if (ns_nonet) return (uint32_t)-1; ns_reqn = ns_respn = ns_respoff = 0; return 0; }
+H(SetNetCallback) { return ns_nonet ? (uint32_t)-1 : 0; }
 H(Htons) { uint32_t v = c->r[0] & 0xffff; return ((v & 0xff) << 8) | (v >> 8); }
 /* --- libc --- */
 H(Atoi)    { return (uint32_t)atoi(gstr(c->r[0])); }
@@ -433,9 +452,9 @@ static const HleDef defs[] = {
     {0x1fb, 0x12e, "SetCurrentMode", h_SetCurrentMode}, {0x1fb, 0x130, "HandleInput", h_HandleInput},
     {0x1fb, 0x190, "FsOpen", h_FsOpen}, {0x1fb, 0x191, "FsRead", h_FsRead}, {0x1fb, 0x192, "FsWrite", h_FsWrite}, {0x1fb, 0x193, "FsClose", h_FsClose},
     {0x1fb, 0x195, "FsFileAttribute", h_FsFileAttribute}, {0x1fb, 0x196, "FsRemove", h_FsRemove},
-    {0x1fb, 0x258, "Connect", h_Connect}, {0x1fb, 0x259, "NetClose", h_NetClose}, {0x1fb, 0x25b, "SocketConnect", h_NetFail},
-    {0x1fb, 0x25c, "SocketWrite", h_NetFail}, {0x1fb, 0x25d, "SocketRead", h_NetFail}, {0x1fb, 0x25e, "SocketClose", h_NetFail},
-    {0x1fb, 0x265, "SetReadCallback", h_NetFail}, {0x1fb, 0x266, "SetWriteCallback", h_NetFail}, {0x1fb, 0x385, "Htons", h_Htons},
+    {0x1fb, 0x258, "Connect", h_Connect}, {0x1fb, 0x259, "NetClose", h_NetClose}, {0x1fb, 0x25b, "SocketConnect", h_SocketConnect},
+    {0x1fb, 0x25c, "SocketWrite", h_SocketWrite}, {0x1fb, 0x25d, "SocketRead", h_SocketRead}, {0x1fb, 0x25e, "SocketClose", h_SocketClose},
+    {0x1fb, 0x265, "SetReadCallback", h_SetNetCallback}, {0x1fb, 0x266, "SetWriteCallback", h_SetNetCallback}, {0x1fb, 0x385, "Htons", h_Htons},
     {0x1fb, 0x4b0, "ClipCreate", h_ClipCreate}, {0x1fb, 0x4b1, "ClipFree", h_ClipFree}, {0x1fb, 0x4b3, "ClipPutData", h_ClipPutData},
     {0x1fb, 0x4ba, "Play", h_Play}, {0x1fb, 0x4bd, "Stop", h_Stop}, {0x1fb, 0x4c0, "SetVolume", h_SetVolume}, {0x1fb, 0x4c1, "Vibrator", h_Vibrator},
     {0x1fb, 0x4c5, "ClipAllocPlayer", h_ClipAllocPlayer}, {0x1fb, 0x4c6, "ClipFreePlayer", h_ClipFreePlayer}, {0x1fb, 0x4d1, "SetMuteState", h_SetMuteState},
@@ -464,6 +483,7 @@ static uint64_t fnv64(const uint8_t *p, size_t n) { uint64_t h = 0xcbf29ce484222
 
 int gc1_boot(const char *resdir, const char *savedir) {
     snprintf(g_resdir, sizeof g_resdir, "%s", resdir); snprintf(g_savedir, sizeof g_savedir, "%s", savedir);
+    ns_init(savedir);
     #ifdef _WIN32
     G = (uint8_t *)_aligned_malloc(MEM_SIZE, 4096);
 #else

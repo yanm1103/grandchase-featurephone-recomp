@@ -1,0 +1,28 @@
+# servidor falso: abre um Bau do Tesouro (a chave de ouro) e confere a conta: 1300 wons; com GC1_NETLUCK=100 ainda ganha 1 medalha e 1 cupom
+# (o "Sim" do dialogo de compra e chamado direto: call net_send_request(0x65) + net_set_service_mode(chest_choice+2, 0))
+from cidade
+wait 500
+poke 0x1629980 2 0xf41
+poke 0x162998a 1 1
+tap clear
+wait 600
+tap right
+wait 300
+tap right
+wait 300
+tap ok
+wait 500
+tap 1
+wait 400
+tap ok
+wait 500
+tap ok 150
+wait 800
+poke 0x163643c 1 2
+call 0x213ec 0x65
+call 0x21444 4 0
+wait 800
+shot bau_resultado
+tap ok 150
+wait 800
+expect online won == 1300

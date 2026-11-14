@@ -26,7 +26,7 @@ static Action g_act[] = {
 #define NACT ((int)(sizeof g_act / sizeof g_act[0]))
 
 /* teclas da propria plataforma: nao podem ser ligadas a acoes do jogo */
-static int key_reserved(SDL_Keycode k) { return k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F5 || k == SDLK_F9 || k == SDLK_F11; }
+static int key_reserved(SDL_Keycode k) { return k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F3 || k == SDLK_F5 || k == SDLK_F9 || k == SDLK_F11; }
 static void act_parse(Action *a, const char *list) {
     a->k[0] = a->k[1] = a->k[2] = SDLK_UNKNOWN;
     char buf[160]; SDL_strlcpy(buf, list, sizeof buf); int n = 0;
@@ -78,7 +78,7 @@ static int map_key(SDL_Keycode k) {
 }
 
 /* ---- tela de ajuda (F1) ---- */
-static int g_help, g_help_sel, g_help_wait;
+static int g_help, g_help_sel, g_help_wait, g_help_page;      /* g_help_page: 0 = teclas (F1), 1 = Sobre (F3 / botao da gaveta) */
 static void help_draw(SDL_Renderer *r) {
     SDL_SetRenderLogicalPresentation(r, 360, 480, SDL_LOGICAL_PRESENTATION_LETTERBOX);   /* fonte de 8 px: 45 colunas */
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(r, 0, 0, 0, 250);
@@ -105,8 +105,51 @@ static void help_draw(SDL_Renderer *r) {
     SDL_RenderDebugText(r, 12, y, "Arquivo: controles.ini (pasta de saves)"); y += 16;
     SDL_SetRenderDrawColor(r, 255, 220, 90, 255); SDL_RenderDebugText(r, 12, y, "F5 = salvar ESTADO (foto do jogo, em"); y += 11;
     SDL_RenderDebugText(r, 12, y, "qualquer lugar)    F9 = carregar estado."); y += 11;
-    SDL_RenderDebugText(r, 12, y, "F2 = filtro de imagem (LCD, CRT, xBRZ...)");
+    SDL_RenderDebugText(r, 12, y, "F2 = filtro de imagem (LCD, CRT, xBRZ...)"); y += 11;
+    SDL_RenderDebugText(r, 12, y, "F3 = sobre (creditos e contador de wons).");
     SDL_SetRenderLogicalPresentation(r, 240, 320, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+}
+
+/* ---- tela "Sobre" (F3; botao SOBRE da gaveta no toque) ---- */
+static void fmt_milhar(char *o, size_t n, uint32_t v) {      /* 12300 -> "12.300" */
+    char t[24]; SDL_snprintf(t, sizeof t, "%u", v); int L = (int)SDL_strlen(t), j = 0;
+    for (int i = 0; i < L; i++) { if (i && (L - i) % 3 == 0 && j < (int)n - 1) o[j++] = '.'; if (j < (int)n - 1) o[j++] = t[i]; }
+    o[j] = 0;
+}
+static void about_draw(SDL_Renderer *r) {
+    int pw = 0, ph = 0; SDL_RendererLogicalPresentation pm = SDL_LOGICAL_PRESENTATION_DISABLED; SDL_GetRenderLogicalPresentation(r, &pw, &ph, &pm);
+    SDL_SetRenderLogicalPresentation(r, 360, 480, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+    SDL_FRect all = {0, 0, 360, 480}; SDL_RenderFillRect(r, &all);
+    uint32_t won = 0, med = 0, cup = 0; gc1_net_stats(&won, &med, &cup);
+    char w[24]; fmt_milhar(w, sizeof w, won);
+    float y = 12;
+#define LN(col, txt) do { SDL_SetRenderDrawColor(r, (col) >> 16, ((col) >> 8) & 255, (col) & 255, 255); SDL_RenderDebugText(r, 12, y, txt); y += 11; } while (0)
+    SDL_SetRenderDrawColor(r, 255, 220, 90, 255); SDL_RenderDebugText(r, 12, y, "SOBRE   (F3, Esc ou toque fecha)"); y += 20;
+    LN(0xffffff, "GRAND CHASE   (versao de celular, WIPI)");
+    LN(0xc8c8c8, "(c) CJ Internet Corp. & KOG Ltd.");
+    LN(0xc8c8c8, "Desenvolvimento original: Moazio."); y += 8;
+    LN(0x96b4ff, "Esta e uma versao recompilada para PC e");
+    LN(0x96b4ff, "Android, com traducao para portugues e");
+    LN(0x96b4ff, "ajustes de jogabilidade (diagonal, menos");
+    LN(0x96b4ff, "grind, salvar estado, filtros de imagem).");
+    LN(0x96b4ff, "Projeto de fa, sem fins lucrativos e sem");
+    LN(0x96b4ff, "ligacao com os donos do jogo, que seguem");
+    LN(0x96b4ff, "com todos os direitos sobre ele."); y += 14;
+    SDL_SetRenderDrawColor(r, 255, 220, 90, 255); SDL_RenderDebugText(r, 12, y, "SERVICO ONLINE (SUBSTITUIDO POR UM FALSO)"); y += 15;
+    LN(0xffffff, "Se fosse na epoca, voce teria gasto:"); y += 6;
+    char big[48]; SDL_snprintf(big, sizeof big, "%s wons", w);
+    SDL_SetRenderScale(r, 2, 2); SDL_SetRenderDrawColor(r, 120, 255, 150, 255); SDL_RenderDebugText(r, 12 / 2.0f + 4, y / 2, big); SDL_SetRenderScale(r, 1, 1); y += 26;
+    LN(0xc8c8c8, "com pergaminhos de ressurreicao (100) e");
+    LN(0xc8c8c8, "chaves de bau (500, 900 e 1300), que eram");
+    LN(0xc8c8c8, "vendidos pela rede. Aqui sao gratis e o");
+    LN(0xc8c8c8, "total so mostra quanto teria custado."); y += 14;
+    char l[64]; SDL_snprintf(l, sizeof l, "Medalhas ganhas: %u", med); LN(0xffd070, l);
+    SDL_snprintf(l, sizeof l, "Cupons ganhos:   %u", cup); LN(0xffd070, l); y += 8;
+    LN(0x909090, "Cupons e ranking sao inventados: o Grand");
+    LN(0x909090, "Chase online da Netmarble nao existe mais.");
+#undef LN
+    SDL_SetRenderLogicalPresentation(r, pw, ph, pm);
 }
 /* devolve 1 se consumiu a tecla */
 static int help_key(SDL_Keycode k) {

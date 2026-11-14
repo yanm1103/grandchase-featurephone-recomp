@@ -79,6 +79,7 @@ int main(int argc, char **argv) {
             if (sscanf(ln, "%ld S %259s", &ms, pth) == 2) { kev[nk] = (KeyEv){ms, 0, 3, 0, 0, 0, {0}}; strcpy(kev[nk++].path, pth); }
             else if (sscanf(ln, "%ld L %259s", &ms, pth) == 2) { kev[nk] = (KeyEv){ms, 0, 4, 0, 0, 0, {0}}; strcpy(kev[nk++].path, pth); }
             else if (sscanf(ln, "%ld P %x %u %i", &ms, &a, &sz, &v) == 4) kev[nk++] = (KeyEv){ms, 0, 2, a, sz, v, {0}};
+            else if (sscanf(ln, "%ld C %x %u %i", &ms, &a, &sz, &v) == 4) kev[nk++] = (KeyEv){ms, 0, 5, a, sz, v, {0}};   /* chama funcao do guest: addr (Thumb) a0 a1 */
             else if (sscanf(ln, "%ld %d %c", &ms, &k, &t) == 3) kev[nk++] = (KeyEv){ms, k, t == 'p', 0, 0, 0, {0}};
         }
         if (f) fclose(f);
@@ -95,6 +96,7 @@ int main(int argc, char **argv) {
         gc1_set_time(now); g_now = now;
         if (!g_smart_on && g_smart_from >= 0 && (long)(now - T0) >= g_smart_from) { gc1_input_enable(1); g_smart_on = 1; }
         while (ki < nk && (uint64_t)(T0 + kev[ki].ms) <= now) { if (kev[ki].press == 3 || kev[ki].press == 4) { int r_ = kev[ki].press == 3 ? gc1_snapshot_save(kev[ki].path) : gc1_snapshot_load(kev[ki].path); fprintf(stderr, "estado %s %s: %d\n", kev[ki].press == 3 ? "salvo" : "carregado", kev[ki].path, r_); if (g_state) fprintf(g_state, "t=%llu STATE %s r=%d\n", (unsigned long long)(g_now - g_T0), kev[ki].press == 3 ? "save" : "load", r_); ki++; continue; }
+            if (kev[ki].press == 5) { uint32_t ca[2] = {kev[ki].size, kev[ki].val}; gc1_call(kev[ki].addr | 1u, 2, ca); ki++; continue; }
             if (kev[ki].press == 2) { for (uint32_t b = 0; b < kev[ki].size; b++) G[kev[ki].addr + b] = (uint8_t)(kev[ki].val >> (8 * b)); ki++; continue; } gc1_input_key(kev[ki].key, kev[ki].press); if (g_state) { char w[32]; snprintf(w, sizeof w, "K%c%d", kev[ki].press ? 43 : 45, kev[ki].key); log_state(w); } ki++; }
         gc1_run_timers(); ap_tick();
     }

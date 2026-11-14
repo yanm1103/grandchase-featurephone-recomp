@@ -179,7 +179,7 @@ static void android_extract(const char *base) {
 
 
 int main(int argc, char **argv) {
-    const char *res = "game", *save = "save", *selftest = NULL, *selftest_state = NULL, *load_state = NULL; int nohelp = 0; int scale = 3, full = 0, raw_input = 0, st_n = 0;
+    const char *res = "game", *save = "save", *selftest = NULL, *selftest_state = NULL, *load_state = NULL; int nohelp = 0, selftest_about = 0; int scale = 3, full = 0, raw_input = 0, st_n = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--res") && i + 1 < argc) res = argv[++i];
         else if (!strcmp(argv[i], "--save") && i + 1 < argc) save = argv[++i];
@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--touch")) g_touch_ui = 1;                         /* controles de toque (no PC o mouse vira dedo) */
         else if (!strcmp(argv[i], "--selftest-shot") && i + 1 < argc) { selftest = argv[++i]; nohelp = 1; }
         else if (!strcmp(argv[i], "--selftest-state") && i + 1 < argc) selftest_state = argv[++i];   /* F5, depois F9 (eventos sinteticos), captura BMP e sai */
+        else if (!strcmp(argv[i], "--selftest-about") && i + 1 < argc) { selftest = argv[++i]; selftest_about = 1; }   /* igual ao --selftest-help, mas abre a tela Sobre */
         else if (!strcmp(argv[i], "--selftest-help") && i + 1 < argc) selftest = argv[++i];   /* abre a ajuda, salva uma captura BMP e sai (para teste automatico) */
         else if (!strcmp(argv[i], "--load-state") && i + 1 < argc) load_state = argv[++i];     /* comeca de um save state (ex.: build/pt/states/cidade.snap) */
         else if (!strcmp(argv[i], "--fullscreen")) full = 1;        else if (!strcmp(argv[i], "--record") && i + 1 < argc) g_rec = fopen(argv[++i], "w");
@@ -223,7 +224,8 @@ int main(int argc, char **argv) {
     if (load_state) { gc1_set_time(game_now()); state_file(0, load_state, 1, ""); }
 #ifdef __ANDROID__
     { char path[620]; SDL_snprintf(path, sizeof path, "%s/auto.snap", save); gc1_set_time(game_now());
-      if (state_file(0, path, 1, "") == 0) { SDL_snprintf(g_toast, sizeof g_toast, "Continuando de onde parou"); g_toast_until = now_ms() + 2200; g_dirty = 1; } }
+      if (state_file(0, path, 1, "") == 0) { SDL_snprintf(g_toast, sizeof g_toast, "Continuando de onde parou"); g_toast_until = now_ms() + 2200; g_dirty = 1; }
+      SDL_RemovePath(path); }      /* a foto automatica so vale UMA vez (app morto em segundo plano); se ficasse, uma abertura futura voltaria a um ponto velho, por cima do que o jogador salvou depois */
 #endif
     SDL_Gamepad *pad = NULL;
     int nj = 0; SDL_JoystickID *ids = SDL_GetGamepads(&nj); if (nj > 0) pad = SDL_OpenGamepad(ids[0]); SDL_free(ids);
@@ -239,11 +241,17 @@ int main(int argc, char **argv) {
             switch (e.type) {
                 case SDL_EVENT_QUIT: run = 0; break;
                 case SDL_EVENT_DID_ENTER_FOREGROUND:
-                    if (g_bg) { g_skew += now_ms() - g_bg_t0; g_bg = 0; g_dirty = 1; }
+                    if (g_bg) { g_skew += now_ms() - g_bg_t0; g_bg = 0; g_dirty = 1; char ap[620]; SDL_snprintf(ap, sizeof ap, "%s/auto.snap", save); SDL_RemovePath(ap); }   /* voltou: o app nao morreu, a foto ficou velha */
                     break;
                 case SDL_EVENT_KEY_DOWN:
                     if (e.key.repeat) break;
-                    if (e.key.key == SDLK_F1) {
+                    if (g_help && g_help_page == 1) {                                        /* Sobre: qualquer tecla fecha */
+                        g_help = 0; g_help_page = 0; g_skew += now_ms() - g_pause_t0; g_dirty = 1; break;
+                    }
+                    if (e.key.key == SDLK_F1 || e.key.key == SDLK_F3) {                      /* F1 = teclas, F3 = sobre (as duas pausam o jogo) */
+                        int pg = e.key.key == SDLK_F3;
+                        if (g_help && g_help_page != pg) { g_help_page = pg; g_help_wait = 0; g_dirty = 1; break; }
+                        g_help_page = pg;
                         g_help = !g_help; g_help_wait = 0; g_dirty = 1;
                         if (g_help) g_pause_t0 = now_ms(); else g_skew += now_ms() - g_pause_t0;
                         if (g_help) for (int i = 0; i < 512; i++) if (held[i]) { rec_key(held[i], 0); gc1_input_key(held[i], 0); held[i] = 0; }
@@ -264,7 +272,9 @@ int main(int argc, char **argv) {
                 case SDL_EVENT_KEY_UP:
                     { int k = held[(e.key.scancode) & 511]; if (k) { held[(e.key.scancode) & 511] = 0; gc1_set_time(game_now()); rec_key(k, 0); gc1_input_key(k, 0); } }
                     break;
-                case SDL_EVENT_FINGER_DOWN: if (g_touch_ui) { gc1_set_time(game_now()); touch_event(e.tfinger.fingerID, e.tfinger.x, e.tfinger.y, 1); } break;
+                case SDL_EVENT_FINGER_DOWN:
+                    if (g_touch_ui && g_help) { g_help = 0; g_help_page = 0; g_skew += now_ms() - g_pause_t0; g_dirty = 1; }      /* toque fecha o Sobre */
+                    else if (g_touch_ui) { gc1_set_time(game_now()); touch_event(e.tfinger.fingerID, e.tfinger.x, e.tfinger.y, 1); } break;
                 case SDL_EVENT_FINGER_MOTION: if (g_touch_ui) touch_event(e.tfinger.fingerID, e.tfinger.x, e.tfinger.y, 2); break;
                 case SDL_EVENT_FINGER_UP: case SDL_EVENT_FINGER_CANCELED: if (g_touch_ui) touch_event(e.tfinger.fingerID, e.tfinger.x, e.tfinger.y, 0); break;
                 case SDL_EVENT_GAMEPAD_ADDED: if (!pad) pad = SDL_OpenGamepad(e.gdevice.which); break;
@@ -276,6 +286,8 @@ int main(int argc, char **argv) {
         }
         gc1_set_time(game_now());
         if (g_state_req == 3) { gfx_filter_next(); g_state_req = 0; g_dirty = 1; }           /* botao FILTRO da gaveta (toque) */
+        if (g_state_req == 4) { g_state_req = 0; g_help = 1; g_help_page = 1; g_help_wait = 0; g_pause_t0 = now_ms(); g_dirty = 1; }     /* botao SOBRE da gaveta */
+        { char nb[96]; if (gc1_net_notice(nb, sizeof nb)) { SDL_snprintf(g_toast, sizeof g_toast, "%s", nb); g_toast_until = now_ms() + 6000; g_dirty = 1; } }   /* cupom ganho no bau */
         if (g_state_req) {
             char path[620]; SDL_snprintf(path, sizeof path, "%s/estado.snap", save);
             if (g_state_req == 1) state_file(1, path, 0, "Estado salvo"); else state_file(0, path, 0, "Estado carregado");
@@ -290,12 +302,12 @@ int main(int argc, char **argv) {
             if (st_n == 90) { SDL_Surface *sf = SDL_RenderReadPixels(ren, NULL); if (sf) { SDL_SaveBMP(sf, selftest_state); SDL_DestroySurface(sf); } SDL_Log("selftest-state: %s", g_toast); run = 0; }
         }
         if (selftest && tex) {
-            if (++st_n == 30) { g_help = !nohelp; g_dirty = 1; }
+            if (++st_n == 30) { g_help = !nohelp; g_help_page = selftest_about; g_dirty = 1; }
             if (st_n == 32) { SDL_Surface *sf = SDL_RenderReadPixels(ren, NULL); if (sf) { SDL_SaveBMP(sf, selftest); SDL_DestroySurface(sf); } run = 0; }
         }
         if (g_dirty && tex) { g_dirty = 0; SDL_SetRenderDrawColor(ren, 0, 0, 0, 255); SDL_RenderClear(ren);
             if (g_touch_ui) { touch_layout(); gfx_draw_game(ren, tex, &g_game_rect, g_gw, g_gh); touch_draw(ren); } else gfx_draw_game(ren, tex, NULL, g_gw, g_gh);
-            if (g_help && !g_touch_ui) help_draw(ren);
+            if (g_help && g_help_page == 1) about_draw(ren); else if (g_help && !g_touch_ui) help_draw(ren);
             if (now_ms() < g_toast_until) { SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(ren, 0, 0, 0, 200); float tk = g_touch_ui ? SDL_max(1.0f, SDL_floorf(g_scr_w / 240.0f)) : 1.0f; SDL_SetRenderScale(ren, tk, tk); SDL_FRect bx = {0, 0, (g_touch_ui ? g_scr_w : 240) / tk, 14}; SDL_RenderFillRect(ren, &bx); SDL_SetRenderDrawColor(ren, 255, 235, 120, 255); SDL_RenderDebugText(ren, 6, 3, g_toast); SDL_SetRenderScale(ren, 1, 1); g_dirty = 1; }
             SDL_RenderPresent(ren); }
     }
