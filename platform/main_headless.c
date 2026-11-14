@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--dump-every") && i + 1 < argc) g_dump_every = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--shots") && i + 1 < argc) { for (char *t = strtok(argv[++i], ","); t && g_nshot < 64; t = strtok(NULL, ",")) g_shot_t[g_nshot++] = strtoull(t, 0, 10); }
         else if (!strcmp(argv[i], "--load") && i + 1 < argc) g_loadsnap = argv[++i];
+        else if (!strcmp(argv[i], "--wraplog") && i + 1 < argc) gc1_wraplog(fopen(argv[++i], "w"));
         else if (!strcmp(argv[i], "--smart")) g_smart_from = 0;
         else if (!strcmp(argv[i], "--smart-from") && i + 1 < argc) g_smart_from = atol(argv[++i]);
         else if (!strcmp(argv[i], "--state") && i + 1 < argc) g_state = fopen(argv[++i], "w");

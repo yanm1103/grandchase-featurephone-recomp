@@ -19,6 +19,10 @@ for f in sorted(glob.glob(os.path.join(W, 'out', '*.json'))):
     for k_, v in d.items():
         if k_ != '_novos_termos': tr[k_] = norm(v)
 tr.update({k_: norm(v) for k_, v in json.load(open(os.path.join(W, 'overrides.json'), encoding='utf8')).items()})
+for f_ in sorted(glob.glob(os.path.join(W, 'acentos', 'out', '*.json'))):      # passe de acentuacao (acentos.py): por cima de tudo
+    tr.update(json.load(open(f_, encoding='utf8')))
+if os.environ.get('GC1_EXTRA'):      # texto extra (ex.: pilotos de acentuacao) por cima de tudo
+    tr.update(json.load(open(os.environ['GC1_EXTRA'], encoding='utf8')))
 npc = json.load(open(os.path.join(W, 'npc_pt.json'), encoding='utf8'))
 for c in cat:
     if c['kind'] == 'cd' and c['table'] == 'npc': tr[c['id']] = npc[str(c['rec'])][0 if c['field'] == 'title' else 1]
@@ -63,7 +67,8 @@ def final_text(uid):
         title, body = t.split('/', 1); return title + '/' + wrap(body, 112 if c['line'] in (40, 41, 42) else DESC_W, '|')
     return t
 expected = {c['id']: final_text(c['id']) for c in cat if not (c['kind'] == 'ui' and not ui_ok(c))}
-def enc(s): return s.encode('ascii')
+import charset
+enc = charset.enc
 
 # ---------------- reconstrucao ----------------
 if os.path.exists(OUT): shutil.rmtree(OUT)
@@ -137,20 +142,20 @@ def reread():
     for n in script_names('ko'):
         code = open(f'{OUT}/{n}.scp', 'rb').read(); dat = open(f'{OUT}/{n}.dat', 'rb').read()
         for i, r in enumerate(scp.text_refs(code)):
-            got[f'dlg|{n}|{i}'] = dat[r['off']:r['off'] + r['len']].decode('ascii') if r['len'] else ''
+            got[f'dlg|{n}|{i}'] = charset.dec(dat[r['off']:r['off'] + r['len']]) if r['len'] else ''
     for f in tables.SCHEMAS:
         if f == 'scp_npc': continue
         s = open(f'{OUT}/{f}.scp', 'rb').read(); d = open(f'{OUT}/{f}.dat', 'rb').read()
         for r, fi, po, pl, w, off, ln in tables.fields(f, s, len(d)):
-            if ln: got[f'tbl|{f}|{r}|{fi}'] = d[off:off + ln].decode('ascii')
+            if ln: got[f'tbl|{f}|{r}|{fi}'] = charset.dec(d[off:off + ln])
     for f in ('menu.tx', 'npcmenu.tx'):
         for i, a in enumerate(open(f'{OUT}/{f}', 'rb').read().split(b'\r\n')):
-            if a: got[f'menu|{f}|{i}'] = a.decode('ascii')
+            if a: got[f'menu|{f}|{i}'] = charset.dec(a)
     d = open(f'{OUT}/ConstData.br', 'rb').read()
     for name, i, kind, po, pl, off, ln in constdata.fields(d):
-        got[f'cd|{name}|{i}|{kind}|{po}'] = d[constdata.BLOB + off:constdata.BLOB + off + ln].decode('ascii')
+        got[f'cd|{name}|{i}|{kind}|{po}'] = charset.dec(d[constdata.BLOB + off:constdata.BLOB + off + ln])
     t2, _ = ui.load_text(f'{OUT}/binary.mod')
-    for a, sb, cap in ui.slots(t2): got[f'ui|{a:#x}'] = sb.decode('latin1')
+    for a, sb, cap in ui.slots(t2): got[f'ui|{a:#x}'] = charset.dec(sb)
     return got
 got = reread(); bad = [u for u in expected if u in got and got[u] != expected[u]]
 nomatch = [u for u in expected if by_id[u]['kind'] != 'ui' and u not in got and expected[u] != '']

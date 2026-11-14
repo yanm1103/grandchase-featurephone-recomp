@@ -101,6 +101,8 @@ int gc1_run_timers(void) {
     if (n && g_smart) smart_tick();
     return n;
 }
+uint32_t gc1_guest_alloc(uint32_t n) { return heap_alloc(n); }
+uint64_t gc1_get_time(void) { return g_now; }
 int gc1_should_exit(void) { return g_exit; }
 
 /* ---------------------------------------------------------------------------------------------------- */
@@ -497,6 +499,7 @@ int gc1_boot(const char *resdir, const char *savedir) {
     uint32_t is = LD32(p1 + 0x214), fn_init = LD32(is + 4);
     if (gc1_trace) fprintf(gc1_trace, "boot init_struct=%08x fn_init=%08x\n", is, fn_init);
     gc1_call(fn_init, 0, NULL);
+    gc1_patches_install();
     return 0;
 }
 void gc1_start(void)  { if (gc1_trace) fprintf(gc1_trace, "call startClet\n"); gc1_call(g_clet[0], 0, NULL); }
@@ -586,6 +589,7 @@ int gc1_snapshot_load(const char *path) {
     memcpy(files, nf, sizeof files); memcpy(clips, nc, sizeof clips);
     g_exit = h.exit_; memcpy(g_clet, h.clet, sizeof g_clet); g_disp_w = h.disp_w; g_disp_h = h.disp_h; g_annunc = h.annunc; g_fb_buf = h.fb_buf; g_fb_handle = h.fb_handle; im_modes = h.im_modes;
     gc_cpu = h.cpu; g_nheld = 0;
+    gc1_patches_reset();
     g_off = g_raw - h.now; g_now = h.now;               /* o relogio do jogo continua de onde estava */
     return 0;
 }

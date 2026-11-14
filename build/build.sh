@@ -17,7 +17,7 @@ compile() { # compile <src>  -> obj
   if [ ! -f "$o" ] || [ "$src" -nt "$o" ] || [ runtime/rt.h -nt "$o" ] || [ runtime/gc1.h -nt "$o" ]; then cc "${CF[@]}" -I third_party/unicorn/include -c "$src" -o "$o"; fi
 }
 pids=()
-for src in gen/blocks_*.c gen/tables.c runtime/cpu.c runtime/hle.c runtime/audio_policy.c runtime/cpu_unicorn.c; do
+for src in gen/blocks_*.c gen/tables.c runtime/cpu.c runtime/hle.c runtime/audio_policy.c runtime/patch.c runtime/cpu_unicorn.c; do
   compile "$src" & pids+=($!)
   [ "$src" != runtime/cpu_unicorn.c ] && objs+=("$OUT/obj/$(echo "$src" | tr '/' '_').o")
   if (( ${#pids[@]} >= 8 )); then wait "${pids[0]}"; pids=("${pids[@]:1}"); fi

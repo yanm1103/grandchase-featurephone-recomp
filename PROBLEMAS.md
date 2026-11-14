@@ -16,6 +16,8 @@ Formato: [estado] titulo - causa - onde foi tratado / teste que cobre.
   O texto de ajuda do jogo (menu.tx linha 13) continua com os nomes do celular ("CLR", "tecla Ligar") + uma linha avisando do F1.
 
 ## Em aberto
+- [ok] **Palavras cortadas no meio em dicas/avisos** ("teletran-sportar", "visi-tou") - o jogo quebra por caractere em `text_draw_wrapped`; `runtime/patch.c` agora quebra por palavra. Achados nos testes aleatorios: 9 textos (dicas de teletransporte/refino/bau/runas/mudanca de classe, "Digite o valor...", cobranca de conexao); `--wraplog arq` do headless lista os que ainda caem no corte por caractere (palavra maior que a linha).
+- [~] **Acentos** - motor pronto (24 letras acentuadas por patch de glifos + `charset.py`; testado com todas as letras e frases); falta o passe de texto (`tools/translate/acentos.py`, ~41 lotes) - piloto em 1 lote.
 - [ ] Texto quebra de linha antes do esperado (margem de seguranca em `tools/translate/build.py`: DLG_W/DESC_W/QUEST_W).
 - [ ] Traducao PT-BR (retraduzida do coreano) nao foi revisada por humano; telas nao conferidas: lojas, inventario, habilidades, HUD de combate, finais.
 - [~] Port Android: APK funcionando no emulador (boot, toque, D-pad, ataque, save state carregado) - ver `android/README.md`. Falta: testar num celular real, ouvir o audio, tablet/paisagem, auto-save ao pausar, tela de ajuda no toque, APK de release (hoje debuggable, chave de debug).

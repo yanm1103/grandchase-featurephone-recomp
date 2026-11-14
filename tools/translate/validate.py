@@ -1,5 +1,6 @@
 """Valida uma traducao de lote. Uso: python -I validate.py saida.json lote.json   (sai com 1 se houver erro)"""
-import sys, json, re, collections
+import sys, os, json, re, collections
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding='utf-8')
 TOK = re.compile(r'%[0-9]*[dsxc]|@[1-9]')
 BAD = [(r'\bLira\b', 'Lire (nunca Lira)'), (r'\bGaikoz\b', 'Gaicoz'), (r'\bCanabana\b', 'Canaban'),
@@ -12,9 +13,10 @@ def check(uid, u, pt):
     if not isinstance(pt, str):
         return [f'{uid}: nao e texto']
     ko = u['ko']; lim = u['limit']
-    bad = [c for c in pt if ord(c) < 0x20 or ord(c) > 0x7e]
+    import charset
+    bad = [c for c in pt if (ord(c) < 0x20 or ord(c) > 0x7e) and c not in charset.TO_BYTE]
     if bad:
-        errs.append(f'{uid}: caractere fora de ASCII imprimivel: {bad[:5]}')
+        errs.append(f'{uid}: caractere nao suportado (so ASCII e as 24 letras acentuadas de charset.py): {bad[:5]}')
     if len(pt) > lim:
         errs.append(f'{uid}: {len(pt)} > limite {lim}: {pt[:50]!r}')
     if ko and not pt.strip():

@@ -32,6 +32,9 @@ void     gc1_paint(void);                                         /* paintClet *
 void     gc1_key(int key, int pressed);                           /* handleCletEvent(502/503, key, 0) */
 void     gc1_input_enable(int on);                                /* liga a camada de entrada inteligente (ver hle.c) */
 void     gc1_input_key(int key, int pressed);                     /* use no lugar de gc1_key nas plataformas */
+void     gc1_patches_install(void);                               /* correcoes do motor (runtime/patch.c); chamado por gc1_boot */
+void     gc1_patches_reset(void);                                 /* chamado apos carregar um save state */
+void     gc1_wraplog(FILE *f);                                    /* diagnostico: grava os textos que o original cortaria no meio de uma palavra */
 int      gc1_snapshot_save(const char *path);                     /* save state: 0 = ok */
 int      gc1_snapshot_load(const char *path);                     /* 0 = ok; 1 arquivo nao existe, 2 corrompido, 3 de outro binario */
 void     gc1_event(uint32_t type, uint32_t p1, uint32_t p2);
@@ -39,6 +42,8 @@ void     gc1_set_time(uint64_t ms);                               /* relogio (ms
 int64_t  gc1_next_due(void);                                      /* proximo vencimento de timer (ms) ou -1 */
 int      gc1_run_timers(void);                                    /* roda timers vencidos; devolve quantos */
 int      gc1_should_exit(void);
+uint64_t gc1_get_time(void);
+uint32_t gc1_guest_alloc(uint32_t n);                             /* aloca no heap do guest (para os patches) */
 uint32_t gc1_call(uint32_t addr, int nargs, const uint32_t *args);/* chama funcao do guest (addr com bit0 = Thumb) */
 uint64_t gc1_frame_crc(void);
 int      gc1_cov_dump(const char *path);                         /* escreve os enderecos dos blocos executados; devolve quantos */                                     /* CRC do framebuffer atual (para traces) */
