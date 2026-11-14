@@ -90,11 +90,36 @@ static int map_pad(SDL_GamepadButton b) {
 static uint64_t now_ms(void);
 static void rec_key(int k, int press) { if (g_rec) { fprintf(g_rec, "%llu %d %c\n", (unsigned long long)(now_ms() - g_rec_t0), k, press ? 'p' : 'r'); fflush(g_rec); } }
 static char g_toast[80]; static uint64_t g_toast_until, g_state_ok;
+static int held[512];                  /* tecla do celular que cada tecla fisica apertou */
+static int g_bg; static uint64_t g_bg_t0;   /* app em segundo plano (Android): o jogo nao ve esse intervalo */
 static uint64_t g_skew, g_pause_t0;      /* tempo em que o jogo ficou pausado (tela de ajuda): o jogo nao ve esse intervalo */
 #include "touch.h"
 static uint64_t game_now(void);
 static uint64_t now_ms(void) { SDL_Time t; SDL_GetCurrentTime(&t); return (uint64_t)t / 1000000ull; }
 static uint64_t game_now(void) { return now_ms() - g_skew; }
+static void release_held(void) { for (int i = 0; i < 512; i++) if (held[i]) { rec_key(held[i], 0); gc1_input_key(held[i], 0); held[i] = 0; } }
+static const char *g_savedir;
+/* Android: ao minimizar o SDL enfileira WILL_ENTER_BACKGROUND e ja bloqueia o app, entao a foto automatica tem que sair AQUI (observador de eventos, mesma thread do jogo) */
+static int state_file(int save, const char *path, int quiet, const char *ok_msg);
+static bool SDLCALL bg_watch(void *ud, SDL_Event *e) {
+    (void)ud;
+    if ((e->type == SDL_EVENT_WILL_ENTER_BACKGROUND || e->type == SDL_EVENT_TERMINATING) && !g_bg && g_savedir) {
+        char path[620]; SDL_snprintf(path, sizeof path, "%s/auto.snap", g_savedir);
+        gc1_set_time(game_now()); state_file(1, path, 1, "");
+        g_bg = 1; g_bg_t0 = now_ms();
+    }
+    return true;
+}
+/* foto completa do jogo: save = 1 grava, 0 carrega. quiet: sem aviso na tela (autosave) */
+static int state_file(int save, const char *path, int quiet, const char *ok_msg) {
+    release_held();
+    int r = save ? gc1_snapshot_save(path) : gc1_snapshot_load(path);
+    if (!quiet) {
+        SDL_snprintf(g_toast, sizeof g_toast, r ? (save ? "Falha ao salvar o estado" : (r == 1 ? "Nenhum estado salvo" : "Estado incompativel")) : ok_msg);
+        g_toast_until = now_ms() + 1800; g_dirty = 1;
+    }
+    return r;
+}
 
 #ifdef __ANDROID__
 /* Os arquivos do jogo vao dentro do APK (assets/game, assets/audio, lista em files.txt) e o runtime le com fopen: na primeira execucao
@@ -149,7 +174,7 @@ int main(int argc, char **argv) {
     SDL_snprintf(rbuf, sizeof rbuf, "%s/game", abase); SDL_snprintf(sbuf, sizeof sbuf, "%s/save", abase); SDL_snprintf(abuf, sizeof abuf, "%s/audio", abase);
     res = rbuf; save = sbuf; g_audio_dir = abuf; SDL_CreateDirectory(save);
 #endif
-    keymap_load(save);
+    keymap_load(save); g_savedir = save; SDL_AddEventWatch(bg_watch, NULL);
     if (g_touch_ui) SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");
     win = SDL_CreateWindow("Grand Chase 1 (recomp)", g_touch_ui ? 405 : 240 * scale, g_touch_ui ? 880 : 320 * scale, SDL_WINDOW_RESIZABLE | (full ? SDL_WINDOW_FULLSCREEN : 0));
     ren = win ? SDL_CreateRenderer(win, NULL) : NULL;
@@ -167,9 +192,12 @@ int main(int argc, char **argv) {
         return rc;
     }
     gc1_start(); g_rec_t0 = now_ms(); if (!raw_input) gc1_input_enable(1);
+#ifdef __ANDROID__
+    { char path[620]; SDL_snprintf(path, sizeof path, "%s/auto.snap", save); gc1_set_time(game_now());
+      if (state_file(0, path, 1, "") == 0) { SDL_snprintf(g_toast, sizeof g_toast, "Continuando de onde parou"); g_toast_until = now_ms() + 2200; g_dirty = 1; } }
+#endif
     SDL_Gamepad *pad = NULL;
     int nj = 0; SDL_JoystickID *ids = SDL_GetGamepads(&nj); if (nj > 0) pad = SDL_OpenGamepad(ids[0]); SDL_free(ids);
-    int held[512] = {0};
     int run = 1;
     while (run && !gc1_should_exit()) {
         gc1_set_time(game_now());
@@ -181,6 +209,9 @@ int main(int argc, char **argv) {
         while (have) {
             switch (e.type) {
                 case SDL_EVENT_QUIT: run = 0; break;
+                case SDL_EVENT_DID_ENTER_FOREGROUND:
+                    if (g_bg) { g_skew += now_ms() - g_bg_t0; g_bg = 0; g_dirty = 1; }
+                    break;
                 case SDL_EVENT_KEY_DOWN:
                     if (e.key.repeat) break;
                     if (e.key.key == SDLK_F1) {
@@ -191,10 +222,8 @@ int main(int argc, char **argv) {
                     }
                     if (!g_help && (e.key.key == SDLK_F5 || e.key.key == SDLK_F9)) {      /* save state: foto completa do jogo, em qualquer lugar */
                         char path[620]; SDL_snprintf(path, sizeof path, "%s/estado.snap", save);
-                        for (int i = 0; i < 512; i++) if (held[i]) { rec_key(held[i], 0); gc1_input_key(held[i], 0); held[i] = 0; }
-                        int r = e.key.key == SDLK_F5 ? gc1_snapshot_save(path) : gc1_snapshot_load(path);
-                        SDL_snprintf(g_toast, sizeof g_toast, r ? (e.key.key == SDLK_F5 ? "Falha ao salvar o estado" : (r == 1 ? "Nenhum estado salvo (F5)" : "Estado incompativel")) : (e.key.key == SDLK_F5 ? "Estado salvo (F9 carrega)" : "Estado carregado"));
-                        g_toast_until = now_ms() + 1800; g_dirty = 1; break;
+                        if (e.key.key == SDLK_F5) state_file(1, path, 0, "Estado salvo (F9 carrega)"); else state_file(0, path, 0, "Estado carregado");
+                        break;
                     }
                     if (g_help) { help_key(e.key.key); g_dirty = 1; break; }
                     if (e.key.key == SDLK_F11) { SDL_SetWindowFullscreen(win, !(SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN)); break; }
@@ -214,6 +243,11 @@ int main(int argc, char **argv) {
             have = SDL_PollEvent(&e);
         }
         gc1_set_time(game_now());
+        if (g_state_req) {
+            char path[620]; SDL_snprintf(path, sizeof path, "%s/estado.snap", save);
+            if (g_state_req == 1) state_file(1, path, 0, "Estado salvo"); else state_file(0, path, 0, "Estado carregado");
+            g_state_req = 0;
+        }
         if (!g_help) gc1_run_timers();
         audio_pump();
         if (selftest_state && tex) {
@@ -229,7 +263,7 @@ int main(int argc, char **argv) {
         if (g_dirty && tex) { g_dirty = 0; SDL_SetRenderDrawColor(ren, 0, 0, 0, 255); SDL_RenderClear(ren);
             if (g_touch_ui) { touch_layout(); SDL_RenderTexture(ren, tex, NULL, &g_game_rect); touch_draw(ren); } else SDL_RenderTexture(ren, tex, NULL, NULL);
             if (g_help && !g_touch_ui) help_draw(ren);
-            if (now_ms() < g_toast_until) { SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(ren, 0, 0, 0, 200); SDL_FRect bx = {0, 0, 240, 14}; SDL_RenderFillRect(ren, &bx); SDL_SetRenderDrawColor(ren, 255, 235, 120, 255); SDL_RenderDebugText(ren, 6, 3, g_toast); g_dirty = 1; }
+            if (now_ms() < g_toast_until) { SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND); SDL_SetRenderDrawColor(ren, 0, 0, 0, 200); float tk = g_touch_ui ? SDL_max(1.0f, SDL_floorf(g_scr_w / 240.0f)) : 1.0f; SDL_SetRenderScale(ren, tk, tk); SDL_FRect bx = {0, 0, (g_touch_ui ? g_scr_w : 240) / tk, 14}; SDL_RenderFillRect(ren, &bx); SDL_SetRenderDrawColor(ren, 255, 235, 120, 255); SDL_RenderDebugText(ren, 6, 3, g_toast); SDL_SetRenderScale(ren, 1, 1); g_dirty = 1; }
             SDL_RenderPresent(ren); }
     }
     if (g_rec) fclose(g_rec);

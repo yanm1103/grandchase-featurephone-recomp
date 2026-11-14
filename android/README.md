@@ -25,3 +25,5 @@ adb push build/pt/states/torre1.snap /data/local/tmp/estado.snap ; adb shell run
 - Audio no Android nao foi ouvido (o emulador roda com `-no-audio`); o codigo de audio e o mesmo do PC.
 - Sem auto-save ao ir para segundo plano; o Android pode matar o app (use SALVAR do jogo ou o estado).
 - Layout de toque ajustado so para 1080x2400 retrato; sem tablet/paisagem. Sem tela de ajuda/rebind (F1) no toque.
+
+- Estado na tela: SALVAR ESTADO / CARREGAR ESTADO (mesma foto do F5/F9, `files/save/estado.snap`). Ao minimizar ou fechar, o app grava `files/save/auto.snap` e ao abrir de novo retoma dali; a gravacao sai de um observador de eventos (`bg_watch` em `platform/main_sdl.c`), porque o SDL bloqueia o app logo apos enfileirar WILL_ENTER_BACKGROUND.
