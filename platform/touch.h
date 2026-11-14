@@ -7,10 +7,31 @@
 typedef struct { int kind; int key; float x, y, w, h; const char *label; } Ctl;     /* kind 0 = botao retangular, 1 = D-pad (x,y = centro, w = raio), 2 = botao redondo (w = raio) */
 static Ctl g_ctl[16]; static int g_nctl;
 static SDL_FRect g_game_rect; static int g_touch_ui; static int g_scr_w, g_scr_h;
-typedef struct { SDL_FingerID id; int used; int ctl; int key; } Finger;
+typedef struct { SDL_FingerID id; int used; int ctl; int key; int mode, moved; float sx, sy, hy0; } Finger;     /* mode: 0 controles, 1 aba da gaveta, 2 gaveta aberta */
 static Finger g_fing[10];
+/* gaveta de estado: aba na borda esquerda (arrastavel na vertical enquanto fechada, posicao salva em gaveta.txt); aberta mostra SALVAR/CARREGAR ESTADO */
+static float g_hy = 0.45f; static int g_drawer_open; static float g_drawer_anim;
+static SDL_FRect g_handle, g_panel, g_dbtn[2]; static char g_cfgfile[600];
+static const char *const g_dlabel[2] = { "SALVAR|ESTADO", "CARREGAR|ESTADO" };
+static void touch_cfg_load(const char *dir) {
+    SDL_snprintf(g_cfgfile, sizeof g_cfgfile, "%s/gaveta.txt", dir);
+    FILE *f = fopen(g_cfgfile, "r"); if (!f) return;
+    float v; if (fscanf(f, "%f", &v) == 1 && v >= 0.05f && v <= 0.95f) g_hy = v;
+    fclose(f);
+}
+static void touch_cfg_save(void) { FILE *f = fopen(g_cfgfile, "w"); if (f) { fprintf(f, "%.3f\n", g_hy); fclose(f); } }
 static int g_state_req;        /* pedido dos botoes de estado: 1 = salvar, 2 = carregar (o laco principal atende) */
 
+static int in_rect(const SDL_FRect *r, float x, float y) { return x >= r->x && x <= r->x + r->w && y >= r->y && y <= r->y + r->h; }
+static void drawer_layout(void) {
+    float W = (float)g_scr_w, H = (float)g_scr_h, a = g_drawer_anim; a = a * a * (3 - 2 * a);
+    float bw = W * 0.5f, bh = W * 0.15f, pad = W * 0.025f, hw = W * 0.07f, hh = W * 0.19f;
+    float ph = 2 * bh + 3 * pad, pw = bw + 2 * pad;
+    float cyh = SDL_clamp(g_hy * H, hh / 2, H - hh / 2), ptop = SDL_clamp(cyh - ph / 2, 0, H - ph), px = -pw * (1 - a);
+    g_panel = (SDL_FRect){ px, ptop, pw, ph };
+    for (int i = 0; i < 2; i++) g_dbtn[i] = (SDL_FRect){ px + pad, ptop + pad + i * (bh + pad), bw, bh };
+    g_handle = (SDL_FRect){ px + pw, cyh - hh / 2, hw, hh };
+}
 /* calcula o retangulo do jogo e a posicao dos controles para a janela atual */
 static void touch_layout(void) {
     SDL_GetRenderOutputSize(ren, &g_scr_w, &g_scr_h);
@@ -29,8 +50,6 @@ static void touch_layout(void) {
     g_ctl[g_nctl++] = (Ctl){1, 0, W * 0.27f, cy, R, 0, ""};
     float r = SDL_min(W * 0.14f, avail * 0.28f);
     g_ctl[g_nctl++] = (Ctl){2, -5, W * 0.80f, cy + r * 0.2f, r, 0, "OK"};
-    g_ctl[g_nctl++] = (Ctl){0, 1001, W * 0.04f, rowy, W * 0.25f, rowh, "SALVAR|ESTADO"};      /* foto do jogo (F5/F9 do PC) */
-    g_ctl[g_nctl++] = (Ctl){0, 1002, W * 0.31f, rowy, W * 0.25f, rowh, "CARREGAR|ESTADO"};
     g_ctl[g_nctl++] = (Ctl){0, -16, W * 0.64f, rowy, W * 0.32f, rowh, "MENU"};
     g_ctl[g_nctl++] = (Ctl){0, -6, W * 0.04f, H - bh * 1.15f, W * 0.28f, bh, "MINIMAPA"};
     g_ctl[g_nctl++] = (Ctl){0, -7, W * 0.36f, H - bh * 1.15f, W * 0.28f, bh, "MAPA"};
@@ -62,12 +81,36 @@ static Finger *finger_get(SDL_FingerID id, int create) {
 /* x,y normalizados (0..1) como nos eventos de dedo do SDL; down: 1 apertou, 2 moveu, 0 soltou */
 static void touch_event(SDL_FingerID id, float nx, float ny, int down) {
     Finger *f = finger_get(id, down == 1); if (!f) return;
-    int key = 0, ci = down ? hit_ctl(nx * g_scr_w, ny * g_scr_h, &key) : -1;
+    float px = nx * g_scr_w, py = ny * g_scr_h;
+    drawer_layout();
+    if (down == 1) {
+        f->mode = 0; f->key = 0; f->ctl = -1; f->moved = 0; f->sx = px; f->sy = py; f->hy0 = g_hy * g_scr_h;
+        SDL_FRect hz = g_handle; hz.x -= 8; hz.w += 16; hz.y -= 16; hz.h += 32;      /* folga de toque */
+        if (in_rect(&hz, px, py)) f->mode = 1;
+        else if (g_drawer_open) {
+            f->mode = 2; for (int i = 0; i < 2; i++) if (in_rect(&g_dbtn[i], px, py)) f->ctl = i;
+            if (f->ctl < 0 && !in_rect(&g_panel, px, py)) g_drawer_open = 0;         /* toque fora fecha (e nao aperta nada do jogo) */
+            g_dirty = 1;
+        }
+    }
+    if (f->mode == 1) {                         /* aba: toque abre/fecha; arrastar (so fechada) muda a altura */
+        if (down == 2 && !g_drawer_open && (SDL_fabsf(py - f->sy) > 14 || f->moved)) { f->moved = 1; g_hy = SDL_clamp((f->hy0 + (py - f->sy)) / g_scr_h, 0.05f, 0.95f); g_dirty = 1; }
+        if (down == 0) { if (f->moved) touch_cfg_save(); else g_drawer_open = !g_drawer_open; g_dirty = 1; f->used = 0; }
+        return;
+    }
+    if (f->mode == 2) {                         /* gaveta aberta: o botao so dispara ao SOLTAR em cima dele */
+        if (down == 2) { int c = -1; for (int i = 0; i < 2; i++) if (in_rect(&g_dbtn[i], px, py)) c = i; if (c != f->ctl) { f->ctl = c; g_dirty = 1; } }
+        if (down == 0) {
+            for (int i = 0; i < 2; i++) if (f->ctl == i && in_rect(&g_dbtn[i], px, py)) { g_state_req = i + 1; g_drawer_open = 0; }
+            g_dirty = 1; f->used = 0;
+        }
+        return;
+    }
+    int key = 0, ci = down ? hit_ctl(px, py, &key) : -1;
     if (!down || ci < 0) key = 0;
     if (key != f->key) {
-        if (f->key && f->key < 1000) { rec_key(f->key, 0); gc1_input_key(f->key, 0); }
-        if (key >= 1000) g_state_req = key - 1000;
-        else if (key) { rec_key(key, 1); gc1_input_key(key, 1); }
+        if (f->key) { rec_key(f->key, 0); gc1_input_key(f->key, 0); }
+        if (key) { rec_key(key, 1); gc1_input_key(key, 1); }
         f->key = key; f->ctl = ci; g_dirty = 1;
     }
     if (!down) f->used = 0;
@@ -89,6 +132,30 @@ static void circle(SDL_Renderer *r, float cx, float cy, float rad, int fill) {
         float h = SDL_sqrtf(rad * rad - (float)(i * i));
         if (fill) { SDL_FRect b = {cx - h, cy + i, 2 * h, 2}; SDL_RenderFillRect(r, &b); } else { SDL_RenderPoint(r, cx + h, cy + i); SDL_RenderPoint(r, cx - h, cy + i); SDL_RenderPoint(r, cx + i, cy + h); SDL_RenderPoint(r, cx + i, cy - h); }
     }
+}
+static void drawer_draw(SDL_Renderer *r, float ts) {
+    static Uint64 last; Uint64 now = SDL_GetTicks(); float dt = last ? (float)(now - last) : 0; last = now; if (dt > 50) dt = 50;
+    float target = g_drawer_open ? 1.0f : 0.0f;
+    if (g_drawer_anim != target) {
+        g_drawer_anim += (target > g_drawer_anim ? 1 : -1) * dt / 160.0f;
+        if (g_drawer_anim < 0 || g_drawer_anim > 1) g_drawer_anim = target;
+        g_dirty = 1;
+    }
+    drawer_layout();
+    if (g_drawer_anim > 0) {
+        SDL_SetRenderDrawColor(r, 14, 14, 20, 255); SDL_RenderFillRect(r, &g_panel);
+        SDL_SetRenderDrawColor(r, 255, 255, 255, 120); SDL_RenderRect(r, &g_panel);
+        for (int i = 0; i < 2; i++) {
+            int on = 0; for (int j = 0; j < 10; j++) if (g_fing[j].used && g_fing[j].mode == 2 && g_fing[j].ctl == i) on = 1;
+            SDL_SetRenderDrawColor(r, 255, on ? 220 : 255, on ? 90 : 255, on ? 150 : 40); SDL_RenderFillRect(r, &g_dbtn[i]);
+            SDL_SetRenderDrawColor(r, 255, 255, 255, 190); SDL_RenderRect(r, &g_dbtn[i]);
+            label_c(r, g_dbtn[i].x + g_dbtn[i].w / 2, g_dbtn[i].y + g_dbtn[i].h / 2, g_dlabel[i], ts * 1.7f);
+        }
+    }
+    int held = 0; for (int j = 0; j < 10; j++) if (g_fing[j].used && g_fing[j].mode == 1) held = 1;
+    SDL_SetRenderDrawColor(r, held ? 255 : 30, held ? 220 : 30, held ? 90 : 40, held ? 200 : 170); SDL_RenderFillRect(r, &g_handle);
+    SDL_SetRenderDrawColor(r, 255, 255, 255, held ? 255 : 150); SDL_RenderRect(r, &g_handle);
+    label_c(r, g_handle.x + g_handle.w / 2, g_handle.y + g_handle.h / 2, g_drawer_open ? "<" : ">", ts * 2.5f);
 }
 static void touch_draw(SDL_Renderer *r) {
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
@@ -114,5 +181,6 @@ static void touch_draw(SDL_Renderer *r) {
             label_c(r, c->x + c->w / 2, c->y + c->h / 2, c->label, ts * (SDL_strchr(c->label, '|') ? 1.2f : SDL_strlen(c->label) > 3 ? 1.6f : 2.2f));
         }
     }
+    drawer_draw(r, ts);
 }
 #endif

@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
     SDL_snprintf(rbuf, sizeof rbuf, "%s/game", abase); SDL_snprintf(sbuf, sizeof sbuf, "%s/save", abase); SDL_snprintf(abuf, sizeof abuf, "%s/audio", abase);
     res = rbuf; save = sbuf; g_audio_dir = abuf; SDL_CreateDirectory(save);
 #endif
-    keymap_load(save); g_savedir = save; SDL_AddEventWatch(bg_watch, NULL);
+    keymap_load(save); touch_cfg_load(save); g_savedir = save; SDL_AddEventWatch(bg_watch, NULL);
     if (g_touch_ui) SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "1");
     win = SDL_CreateWindow("Grand Chase 1 (recomp)", g_touch_ui ? 405 : 240 * scale, g_touch_ui ? 880 : 320 * scale, SDL_WINDOW_RESIZABLE | (full ? SDL_WINDOW_FULLSCREEN : 0));
     ren = win ? SDL_CreateRenderer(win, NULL) : NULL;
