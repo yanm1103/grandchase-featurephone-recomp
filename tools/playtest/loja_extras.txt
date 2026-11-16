@@ -1,0 +1,18 @@
+# lojas de armadura (tipo 4, 5 abas) e de pets (tipo 5): confere (com GC1_SHOPDBG=1, na saida de erro) que os itens sem fonte entram no estoque
+# (npc_shop_type 0x162ba6b, shop_tab_index 0x1638544; shop_rebuild_stock = 0x315ac)
+from cidade
+wait 500
+poke 0x162ba6b 1 4
+poke 0x1638544 1 0
+call 0x315ac 0 0
+poke 0x1638544 1 1
+call 0x315ac 0 0
+poke 0x1638544 1 2
+call 0x315ac 0 0
+poke 0x1638544 1 3
+call 0x315ac 0 0
+poke 0x1638544 1 4
+call 0x315ac 0 0
+poke 0x162ba6b 1 5
+call 0x315ac 0 0
+wait 200

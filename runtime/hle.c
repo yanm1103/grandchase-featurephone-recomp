@@ -238,10 +238,15 @@ H(GetResource) {
     if ((long)got != sz) gc1_fatal("leitura curta do recurso %s", path);
     return 0;
 }
+/* Destinos pequenos (buffers de pilha do guest) para formatos que levam nomes em PT, mais compridos que os coreanos para os quais o jogo foi feito:
+ * "%s%s" (prefixo "+N " + nome do item; 32 bytes em varias telas de inventario/venda/melhoria) e "Local: %s %s %s %s" (4 nomes de mapa; 100 bytes).
+ * O texto e cortado (a traducao ja limita nomes de item a 27 bytes: tools/translate/audit_len.py); sem isso o excesso pisa no quadro da pilha. */
+static size_t sprintk_cap(uint32_t fmt) { return fmt == 0x41ec8 ? 31 : fmt == 0x41e8c ? 99 : 0; }
 H(Sprintk) {
     uint32_t a[6] = {arg(c, 2), arg(c, 3), arg(c, 4), arg(c, 5), arg(c, 6), arg(c, 7)};
     char tmp[4096]; int n = wipi_sprintf(tmp, sizeof tmp, gstr(c->r[1]), a, 6);
     size_t m = (size_t)n < sizeof tmp ? (size_t)n : sizeof tmp - 1;
+    size_t cap = sprintk_cap(c->r[1]); if (cap && m > cap) m = cap;
     memcpy(G + c->r[0], tmp, m); G[c->r[0] + m] = 0;
     return (uint32_t)n;
 }

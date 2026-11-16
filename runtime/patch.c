@@ -275,6 +275,24 @@ static const uint16_t DENNIS_STOCK[] = {
     0xe4f, 0xe50, 0xe51, 0xe52, 0xe53, 0xe54,                                                   /* pacotes de armadura (4 pecas de um set) */
     0xe2a, 0xe4b, 0xe4c, 0xe4d,                                                                 /* receitas */
 };
+/* Itens que nenhum drop, loja ou baú entregava (eram da loja de cash/mercado ou conteudo cortado; docs/INVESTIGACAO_REDE_ITENS.md, secao 2.2) entram nas lojas de
+ * armadura (todas as cidades) e de pets: a loja de armaduras tem 5 abas (Elmo, Armadura, Capa, Luvas, Bota; 40 vagas cada) e o desenho dela serve a rosto e colares/aneis
+ * (que vao nas abas Elmo e Capa). Os precos ja estao no ConstData. */
+#define G_SHOP_TAB      0x1638544u
+#define G_SHOP_EQUIP    0x1633754u
+#define G_SHOP_PET      0x1632aa0u
+static const uint16_t ARMOR_EXTRA_TAB0[] = { 0x209, 0x213, 0x100, 0x101, 0x102, 0x103, 0x104, 0x105, 0x106, 0x107, 0x108, 0x109, 0x10a, 0x10b, 0x10c, 0x10d, 0x10e, 0x10f, 0x110, 0x111, 0x112, 0x113 };
+static const uint16_t ARMOR_EXTRA_TAB1[] = { 0x709, 0x70c, 0x714, 0x719 };
+static const uint16_t ARMOR_EXTRA_TAB2[] = { 0x81a, 0x81b, 0x302, 0x303, 0x304, 0x312, 0x313, 0x314, 0x315 };
+static const uint16_t ARMOR_EXTRA_TAB3[] = { 0x909, 0x90f, 0x914 };
+static const uint16_t ARMOR_EXTRA_TAB4[] = { 0xa09, 0xa0f, 0xa14 };
+static const uint16_t PET_EXTRA[] = { 0xb01, 0xb03, 0xb05 };
+static void shop_add_missing(uint32_t base, const uint16_t *ids, unsigned n) {      /* soma ao estoque (40 vagas de 0x28 bytes, id no primeiro u16) o que ainda nao esta la */
+    for (unsigned k = 0; k < n; k++) {
+        int has = 0; for (uint32_t i = 0; i < 40; i++) if (LD16(base + 0x28 * i) == ids[k]) { has = 1; break; }
+        if (!has) gcall(A_SHOP_ADD, 4, ids[k], 1, 0xffffffffu, 0, 0, 0);
+    }
+}
 static uint32_t hook_shop_rebuild(Cpu *c) {
     Cpu saved = *c; uint32_t lr = c->r[14];
     if (LD8(G_NPC_SHOP_TYPE) == 0x0a) {
@@ -283,6 +301,17 @@ static uint32_t hook_shop_rebuild(Cpu *c) {
     } else {
         uint32_t i0 = (A_SHOP_REBUILD - TEXT_BASE) >> 1; BlockFn hook = gc_blocks[i0]; gc_blocks[i0] = orig_shop;
         gcall(A_SHOP_REBUILD, 0, 0, 0, 0, 0, 0, 0); gc_blocks[i0] = hook;
+        uint32_t type = LD8(G_NPC_SHOP_TYPE), tab = LD8(G_SHOP_TAB);
+        if (type == 4) {
+#define EXTRA(n) shop_add_missing(G_SHOP_EQUIP, ARMOR_EXTRA_TAB##n, sizeof ARMOR_EXTRA_TAB##n / sizeof *ARMOR_EXTRA_TAB##n)
+            switch (tab) { case 0: EXTRA(0); break; case 1: EXTRA(1); break; case 2: EXTRA(2); break; case 3: EXTRA(3); break; case 4: EXTRA(4); break; default: break; }
+#undef EXTRA
+        } else if (type == 5) shop_add_missing(G_SHOP_PET, PET_EXTRA, sizeof PET_EXTRA / sizeof *PET_EXTRA);
+        if (getenv("GC1_SHOPDBG") && (type == 4 || type == 5)) {        /* depuracao: lista o estoque montado */
+            uint32_t base = type == 4 ? G_SHOP_EQUIP : G_SHOP_PET; fprintf(stderr, "SHOPDBG tipo=%u aba=%u:", type, tab);
+            for (uint32_t i = 0; i < 40; i++) if (LD16(base + 0x28 * i)) fprintf(stderr, " %x", LD16(base + 0x28 * i));
+            fputc(10, stderr);
+        }
     }
     *c = saved; return lr;
 }

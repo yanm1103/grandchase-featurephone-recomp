@@ -8,5 +8,5 @@
  "menu|menu.tx|41": "Escolher personagem/Classe defensiva, de ataque fraco.$",
  "menu|menu.tx|42": "Escolher personagem/Classe de ataque alto e boa esquiva.$",
  "ui|0x4258c": "STR: ataque|DEX: defesa,acerto|e esquiva|VIT: HP|LUK: critico,forja",
- "menu|menu.tx|13": "Controles/Mover : setas, 2 4 6 8|Atacar : OK, 5|Menu, cancelar : CLR|Atalhos : 1 3 7 9 0 *|Atalhos extras : #|Quick save : tecla Ligar|Minimapa : tecla sup. esq.|Mapa-mundi : tecla sup. dir.||No PC, aperte F1 para ver|e trocar as teclas.$"
+ "menu|menu.tx|13": "Controles/Mover : setas, 2 4 6 8|Atacar : OK, 5|Cancelar : MENU, Esc, X|Atalhos : 1 3 7 9 0 *|Atalhos extras : #|Salvar : SALVAR, P, F6|Minimapa : MINIMAPA, Q|Mapa-mundi : MAPA, E, M||No celular, os botões ficam na tela e a aba da borda esquerda abre estado, filtro e Sobre.|No PC, aperte F1 para ver e trocar as teclas.$"
 }

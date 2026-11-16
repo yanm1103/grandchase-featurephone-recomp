@@ -80,6 +80,8 @@ def main():
     r = subprocess.run(cmd, capture_output=True, text=True)
     dbg = [l for l in r.stderr.splitlines() if l.startswith('DIAGDBG')]
     if dbg: print(f'  DIAGDBG: {len(dbg)} quadros com o jogador em cima de parede; primeiro: {dbg[0]}')
+    for l in r.stderr.splitlines():
+        if l.startswith('SHOPDBG'): print('  '+l)      # GC1_SHOPDBG=1: estoque das lojas (runtime/patch.c)
     print(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.stdout)
     for t, nm in shots:
         src = os.path.join(a.out, f'q_t{t:07d}.ppm')
