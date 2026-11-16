@@ -287,8 +287,32 @@ static uint32_t hook_shop_rebuild(Cpu *c) {
     *c = saved; return lr;
 }
 
+
+/* ---------------- nome do monstro: buffer de 20 bytes ----------------
+ * load_monster_name (0x14420) copia o nome inteiro para monster_name_buf (0x162b731, 20 bytes) sem checar o tamanho. O coreano cabia; em PT "Capitao Arqueiro
+ * Esqueleto" (26) pisava em dialog_active (0x162b745), save_slot_index (+1) e boss_warning_active (+2): a caixa de aviso nao fechava mais e os saves iam para o slot errado.
+ * Aqui os bytes depois do buffer sao guardados e devolvidos, e o nome e cortado em 19 letras + NUL. */
+#define A_MONSTER_NAME 0x14420u
+#define G_MONSTER_NAME 0x162b731u
+static BlockFn orig_monname;
+static uint32_t hook_monster_name(Cpu *c) {
+    Cpu saved = *c; uint32_t lr = c->r[14]; uint8_t after[256];
+    memcpy(after, G + G_MONSTER_NAME + 20, sizeof after);
+    uint32_t i0 = (A_MONSTER_NAME - TEXT_BASE) >> 1; BlockFn hook = gc_blocks[i0]; gc_blocks[i0] = orig_monname;
+    gcall(A_MONSTER_NAME, 1, saved.r[0], 0, 0, 0, 0, 0); gc_blocks[i0] = hook;
+    memcpy(G + G_MONSTER_NAME + 20, after, sizeof after); G[G_MONSTER_NAME + 19] = 0;
+    *c = saved; return lr;
+}
+
 static BlockFn install(uint32_t addr, BlockFn fn) { uint32_t i = (addr - TEXT_BASE) >> 1; BlockFn o = NULL; if (i < gc_text_halfwords && gc_blocks[i]) { o = gc_blocks[i]; gc_blocks[i] = fn; } return o; }
-void gc1_patches_reset(void) { g_acc_img[3] = 0; }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
+/* Fotos de estado gravadas enquanto o nome do monstro estourava o buffer (ver hook_monster_name) trazem flags e slot de save corrompidos; limpa o que e so flag/slot. */
+static void sanitize_overflow(void) {
+    if (LD8(0x162b745) > 1) ST8(0x162b745, 0);                   /* dialog_active */
+    if (LD8(0x162b746) > 2) ST8(0x162b746, 0);                   /* save_slot_index */
+    for (uint32_t a = 0x162b747; a <= 0x162b749; a++) if (LD8(a) > 1) ST8(a, 0);   /* boss_warning_active, screen_shake_active, screen_overlay_active */
+    if (LD8(0x162b748) == 0) ST8(0x162b74a, 0);                  /* duracao do tremor (so vale com o tremor ligado) */
+}
+void gc1_patches_reset(void) { g_acc_img[3] = 0; sanitize_overflow(); }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
 void gc1_patches_install(void) {
     if (g_patched) return; g_patched = 1;
     if (getenv("GC1_NOPATCH")) return;                       /* depuracao: roda o motor original */
@@ -299,4 +323,5 @@ void gc1_patches_install(void) {
     g_nodiag = getenv("GC1_NODIAG") != NULL; g_diagdbg = getenv("GC1_DIAGDBG") != NULL;
     orig_walk = install(A_WALK_ANIM, hook_walk_anim);
     orig_shop = install(A_SHOP_REBUILD, hook_shop_rebuild);
+    orig_monname = install(A_MONSTER_NAME, hook_monster_name);
 }
