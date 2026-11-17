@@ -3,7 +3,7 @@
 Sem Gradle: `bash android/build_apk.sh [abi ...]` (padrao `x86_64 arm64-v8a`) gera `build/android/gc1.apk` (~34 MB com x86_64+arm64, ~22 MB so arm64; antes de gerar, comprima a musica: `python -I tools/compress_audio.py build/out/audio`; assinado com chave de debug).
 Passos do script: CMake/NDK (SDL3 do codigo-fonte em `third_party/SDL3-3.4.20-src` + `libmain.so` = runtime + codigo recompilado + `platform/main_sdl.c`), assets (`build/out/game_ptbr`, `build/out/audio`),
 icone (`platform/icon_src_61.png`), javac + d8 (fontes Java do SDL + `GC1Activity`), aapt2, zipalign, apksigner.
-Ferramentas: `C:\Users\TwistZero\tools\android-sdk` (platform 34, build-tools 35.0.1 - o d8 do 34.0.0 quebra com uma classe do SDL, NDK 27.2, cmake 3.22.1, emulator, imagem x86_64 API 34), JDK 21. AVD `gc1` em `C:\Users\TwistZero\tools\android-avd`.
+Ferramentas (`ANDROID_SDK` aponta para o SDK; ver `android/build_apk.sh`): SDK com (platform 34, build-tools 35.0.1 - o d8 do 34.0.0 quebra com uma classe do SDL, NDK 27.2, cmake 3.22.1, emulator, imagem x86_64 API 34), JDK 21. Os testes usaram um AVD chamado `gc1`.
 
 ## Como o app funciona
 - Na primeira execucao copia `assets/game`, `assets/audio` (lista em `files.txt`; `apkstamp.txt` no APK x `stamp.txt` interno decide se recopia; cuidado: SDL_LoadFile relativo olha o armazenamento interno antes do APK) para o armazenamento interno (`files/game`, `files/audio`); os saves ficam em `files/save` e nunca sao sobrescritos.
@@ -13,7 +13,7 @@ Ferramentas: `C:\Users\TwistZero\tools\android-sdk` (platform 34, build-tools 35
 
 ## Testar no emulador (sem abrir janela)
 ```
-emulator -avd gc1 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect     (ANDROID_AVD_HOME=C:\Users\TwistZero\tools\android-avd)
+emulator -avd gc1 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect     (defina ANDROID_AVD_HOME se o AVD estiver fora do padrao)
 adb install -r build/android/gc1.apk ; adb shell am start -n dev.gc1.recomp/.GC1Activity
 adb exec-out screencap -p > tela.png          # eu leio a imagem
 adb shell input tap X Y ; adb shell input swipe X Y X Y 1400     # toque / segurar (tela 1080x2400: OK ~ (864,1888), D-pad centro ~ (290,1860))

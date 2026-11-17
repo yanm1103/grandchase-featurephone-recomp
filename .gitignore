@@ -16,3 +16,11 @@ tools/translate/work/acentos/in/
 
 # configuracao do editor
 .vscode/
+
+# configuracao local de ferramentas/assistente (caminhos da sua maquina)
+.claude/settings.local.json
+build/env.local.sh
+android/env.local.sh
+*.apk
+*.exe
+*.dll

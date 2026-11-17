@@ -9,6 +9,7 @@ TARGET=${1:-headless}
 PY=python
 CF=(-O1 -w -I runtime -DGC1_CHECK_MEM)
 if [ ! -f gen/tables.c ] || [ tools/lift/lift.py -nt gen/tables.c ] || [ tools/lift/cfg.py -nt gen/tables.c ] || [ tools/lift/emit.py -nt gen/tables.c ]; then
+  [ -f "$GC1_BINMOD" ] || { echo "defina GC1_BINMOD com o caminho do binary.mod (jar PT extraido) para gerar gen/"; exit 1; }
   echo "gerando gen/ ..."; $PY -I tools/lift/emit.py gen > /dev/null
 fi
 objs=()
@@ -17,7 +18,10 @@ compile() { # compile <src>  -> obj
   if [ ! -f "$o" ] || [ "$src" -nt "$o" ] || [ runtime/rt.h -nt "$o" ] || [ runtime/gc1.h -nt "$o" ]; then cc "${CF[@]}" -I third_party/unicorn/include -c "$src" -o "$o"; fi
 }
 pids=()
-for src in gen/blocks_*.c gen/tables.c runtime/cpu.c runtime/hle.c runtime/audio_policy.c runtime/patch.c runtime/cpu_unicorn.c; do
+srcs=(gen/blocks_*.c gen/tables.c runtime/cpu.c runtime/hle.c runtime/audio_policy.c runtime/patch.c)
+# o backend de referencia (Unicorn) so e compilado para os alvos ref/all; os demais nao precisam de third_party/unicorn
+if [ "$TARGET" = ref ] || [ "$TARGET" = all ]; then srcs+=(runtime/cpu_unicorn.c); fi
+for src in "${srcs[@]}"; do
   compile "$src" & pids+=($!)
   [ "$src" != runtime/cpu_unicorn.c ] && objs+=("$OUT/obj/$(echo "$src" | tr '/' '_').o")
   if (( ${#pids[@]} >= 8 )); then wait "${pids[0]}"; pids=("${pids[@]:1}"); fi
@@ -37,7 +41,7 @@ if [ "$TARGET" = ref ] || [ "$TARGET" = all ]; then
 fi
 if [ "$TARGET" = sdl ] || [ "$TARGET" = all ]; then
   cc "${CF[@]}" -I third_party/SDL3-3.4.20/include -c platform/main_sdl.c -o "$OUT/obj/platform_main_sdl.c.o"
-  (cd platform && "C:/Users/TwistZero/tools/llvm/bin/llvm-rc.exe" /FO "../$OUT/obj/icon.res" icon.rc)   # icone do exe (platform/icon.ico)
+  (cd platform && "$LLVM_RC" /FO "../$OUT/obj/icon.res" icon.rc)   # icone do exe (platform/icon.ico)
   cc "${CF[@]}" "${objs[@]}" "$OUT/obj/platform_main_sdl.c.o" "$OUT/obj/icon.res" -L third_party/SDL3-3.4.20/lib/x64 -lSDL3 -o $OUT/gc1.exe
   cp -f third_party/SDL3-3.4.20/lib/x64/SDL3.dll $OUT/
   echo "ok: $OUT/gc1.exe"

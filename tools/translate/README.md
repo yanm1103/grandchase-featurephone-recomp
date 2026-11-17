@@ -4,7 +4,7 @@ O PT original do jar era traducao automatica palavra por palavra (nomes proprios
 Aqui o texto foi **retraduzido do coreano** e regravado no formato do jogo. O jar PT original nao e alterado: a saida vai para `build/out/game_ptbr`.
 
 ## Como jogar
-`build/out/jogar_ptbr.bat` (ou `gc1_ptbr.exe --res game_ptbr --save save --audio audio`). O jar coreano (`C:\Games\GrandChase1-extracted\ko\jar`) tambem roda com o recomp:
+`build/out/jogar_ptbr.bat` (ou `gc1_ptbr.exe --res game_ptbr --save save --audio audio`). O jar coreano (`$GC1_EXTRACTED/ko/jar`) tambem roda com o recomp:
 o portao de verificacao agora confere so o **codigo** do `.text` (ate 0x40fc8), nao as strings (idioma).
 
 ## Onde fica cada texto (formatos descobertos)

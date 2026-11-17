@@ -89,7 +89,7 @@ int main(int argc, char **argv){
 }
 ''')
 # text.bin tem 0x432a8; o harness le 0x43000 (suficiente: instrucoes < 0x44000)
-shutil.copy(os.path.join(K.IMG, 'text.bin'), os.path.join(OUT, 'text.bin'))
+open(os.path.join(OUT, 'text.bin'), 'wb').write(K.text)
 open(os.path.join(OUT, 'data.bin'), 'wb').write(K.data[:0x1000].ljust(0x1000, b'\0'))
 open(os.path.join(OUT, 'mem0.bin'), 'wb').write(mem0)
 

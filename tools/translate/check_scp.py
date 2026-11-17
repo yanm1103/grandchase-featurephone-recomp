@@ -1,6 +1,6 @@
 import sys,glob,os,re
 sys.path.insert(0,os.path.dirname(__file__)); import scp
-base='C:/Games/GrandChase1-extracted'
+base=os.environ.get('GC1_EXTRACTED','GrandChase1-extracted')
 for lang in ('ko','pt'):
     ok=bad=0; msgs=[]
     for f in sorted(glob.glob(f'{base}/{lang}/jar/[nm]*.scp')):

@@ -32,7 +32,7 @@ Decompilado (`c:\Games\GrandChase1-decomp\decompiled\c\`):
 
 Globais úteis (de `tools/build/globals_all.tsv`): `net_current_msg_id` 0x163683c, `net_service_mode` 0x1637790, `net_request_pending` 0x16329e5, `net_error_code` 0x162ba98, `net_status` 0x162ba5a, `net_connected` 0x1637791, `net_must_reconnect` 0x1636f04, `net_socket` 0x1638508, `net_recv_buf` 0x1636e04 (ponteiro, 2000 B), `net_send_buf_ptr` 0x1637414 (1000 B), `net_io_remaining` 0x16375a4, `net_io_total` 0x16375a0, `net_done_callback` 0x163726c, `chest_server_response` 0x1637324 (ponteiro para o corpo da resposta), `key_result_has_medal` 0x162b790, `key_result_is_coupon` 0x16302c0, `chest_choice` 0x163643c, `items_page_substate` 0x163623a (6 escolher chave, 7 confirmar, 8 resultado, 9 falha), `death_menu_state` 0x1500070 (4 = oferta de compra), `player_gp` 0x162c1a0, `last_loot_ids` 0x162ca8c.
 
-Dados: `C:\Games\GrandChase1-extracted\ko\jar\` (`ConstData.br`, `n56.scp/.dat`, `g_00NN.mgd`, `scp_map`), tabelas de texto em `tools\translate\work\` (`catalog.json`, `acentos\out\*.json`). Scripts de varredura que usei: `C:\Users\TWISTZ~1\AppData\Local\Temp\claude\74933114b6a533e3\44dfdc7e-37b9-4cc5-8433-595c36698bee\scratchpad\items2.py`, `sweep.py` (resultado em `items.json`, `ref.json` na mesma pasta).
+Dados: `$GC1_EXTRACTED/ko/jar/` (`ConstData.br`, `n56.scp/.dat`, `g_00NN.mgd`, `scp_map`), tabelas de texto em `tools\translate\work\` (`catalog.json`, `acentos\out\*.json`). Scripts de varredura que usei: `C:\Users\TWISTZ~1\AppData\Local\Temp\claude\74933114b6a533e3\44dfdc7e-37b9-4cc5-8433-595c36698bee\scratchpad\items2.py`, `sweep.py` (resultado em `items.json`, `ref.json` na mesma pasta).
 
 ## 1. Mapa completo do que usa rede
 

@@ -12,15 +12,19 @@ import capstone as C
 from capstone import arm_const as AC
 from elftools.elf.elffile import ELFFile
 
-DECOMP = r'C:\Games\GrandChase1-decomp'
-IMG = os.path.join(DECOMP, 'ghidra', 'image')
-BINMOD = r'C:\Games\GrandChase1-extracted\pt\jar\binary.mod'
+HERE = os.path.dirname(os.path.abspath(__file__))
+# binary.mod da versao PT (nao incluido no repositorio): variavel de ambiente GC1_BINMOD
+BINMOD = os.environ.get('GC1_BINMOD')
+if not BINMOD or not os.path.isfile(BINMOD):
+    sys.exit('defina GC1_BINMOD com o caminho do binary.mod (jar PT extraido), ex.: GC1_BINMOD=/caminho/pt/jar/binary.mod')
+FUNCS_TSV = os.path.join(HERE, 'functions.tsv')   # limites das funcoes (sementes do CFG), versionado
 TEXT_BASE, DATA_BASE = 0x1000, 0x1400000
 ARM_ENTRIES = {0x1000}          # unico codigo ARM (clet_register_entry); o resto e Thumb
 RODATA = 0x40fc8              # a partir daqui so ha strings/tabelas (o codigo acaba antes)
 
-text = open(os.path.join(IMG, 'text.bin'), 'rb').read()
-data = open(os.path.join(IMG, 'data.bin'), 'rb').read()
+_elf = ELFFile(open(BINMOD, 'rb'))
+text = _elf.get_section_by_name('.text').data()
+data = _elf.get_section_by_name('.data').data()
 TEXT_END = TEXT_BASE + len(text)
 
 _md = {True: C.Cs(C.CS_ARCH_ARM, C.CS_MODE_THUMB), False: C.Cs(C.CS_ARCH_ARM, C.CS_MODE_ARM)}
@@ -72,9 +76,11 @@ STUBS.update(scan_stubs())
 
 def load_functions():
     fs = []
-    for r in csv.DictReader(open(os.path.join(DECOMP, 'decompiled', 'functions.tsv'), encoding='utf8'), delimiter='\t'):
-        a = int(r['addr'], 16)
-        if a < DATA_BASE and a not in STUBS and a not in (0x409b4, 0x40f34): fs.append((a, int(r['size']), r['name']))
+    for ln in open(FUNCS_TSV, encoding='utf8'):
+        if ln.startswith('#') or not ln.strip(): continue
+        a, sz = ln.split()
+        a = int(a, 16)
+        if a < DATA_BASE and a not in STUBS and a not in (0x409b4, 0x40f34): fs.append((a, int(sz), ''))
     return sorted(fs)
 
 

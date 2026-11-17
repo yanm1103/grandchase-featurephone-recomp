@@ -46,9 +46,7 @@ with open(os.path.join(OUT, 'tables.c'), 'w', newline='\n') as f:
     f.write('/* gerado por tools/lift/emit.py - nao edite */\n#include "gc1.h"\n')
     f.write(f'BlockFn gc_blocks[{TEXT_HALF}];\nuint8_t gc_mode[{TEXT_HALF}];\nconst uint32_t gc_text_halfwords = {TEXT_HALF};\n')
     f.write(f'const uint64_t GC1_TEXT_FNV = 0x{fnv64(K.text):x}ull;\nconst uint32_t GC1_TEXT_SIZE = {len(K.text)};\n')
-    f.write(f'const uint64_t GC1_CODE_FNV = 0x{fnv64(K.text[:K.RODATA - K.TEXT_BASE]):x}ull;
-const uint32_t GC1_CODE_SIZE = {K.RODATA - K.TEXT_BASE};
-')
+    f.write(f'const uint64_t GC1_CODE_FNV = 0x{fnv64(K.text[:K.RODATA - K.TEXT_BASE]):x}ull;\nconst uint32_t GC1_CODE_SIZE = {K.RODATA - K.TEXT_BASE};\n')
     f.write('const GcStub gc_stubs[] = {\n')
     for a in sorted(K.STUBS):
         t, i = K.STUBS[a]

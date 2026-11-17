@@ -2,7 +2,7 @@ import sys,os,glob,re
 import sys as _s
 _s.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0,os.path.dirname(__file__)); import scp
-BASE='C:/Games/GrandChase1-extracted/'
+BASE=os.environ.get('GC1_EXTRACTED','GrandChase1-extracted').replace('\\','/').rstrip('/')+'/'   # pasta com ko/jar e pt/jar (jars extraidos; nao fazem parte do repositorio)
 def jar(lang): return f'{BASE}{lang}/jar/'
 def dec(lang,b): return b.decode('cp949' if lang=='ko' else 'latin1', errors='replace')
 def script_names(lang='pt'):

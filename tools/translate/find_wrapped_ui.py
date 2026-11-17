@@ -4,7 +4,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 HERE = os.path.dirname(os.path.abspath(__file__)); W = os.path.join(HERE, 'work')
 cat = json.load(open(os.path.join(W, 'catalog.json'), encoding='utf8'))
 lits = {}
-for f in glob.glob(r'C:\Games\GrandChase1-decomp\decompiled\c\*.c'):
+for f in glob.glob(os.path.join(os.environ.get('GC1_DECOMP', 'GrandChase1-decomp'), 'decompiled', 'c', '*.c')):
     t = open(f, encoding='utf8', errors='replace').read()
     for m in re.finditer(r'(text_draw_wrapped|draw_confirm_dialog|draw_message_box_ok)\(\s*"((?:[^"\\]|\\.)*)"', t):
         s = m.group(2).replace('\\"', '"').replace('\\\\', '\\')

@@ -1,12 +1,14 @@
 #!/bin/bash
 # Monta o APK do Grand Chase 1 (recomp) sem Gradle: CMake/NDK -> .so, javac+d8 -> dex, aapt2 -> apk, zipalign, apksigner (chave de debug).
 # Uso: bash android/build_apk.sh [abi ...]        (padrao: x86_64 arm64-v8a)     saida: build/android/gc1.apk
-# Precisa do SDK em C:/Users/TwistZero/tools/android-sdk (platform 34, build-tools 35.0.1, NDK 27.2, cmake 3.22.1) e JDK 21.
+# Precisa do SDK Android (platform 34, build-tools 35.0.1, NDK 27.2, cmake 3.22.1) e JDK 21. Caminhos: variaveis ANDROID_SDK e JAVA_HOME
+# (ou android/env.local.sh, ignorado pelo git).
 set -e
 cd "$(dirname "$0")/.."; ROOT=$PWD
-SDK=C:/Users/TwistZero/tools/android-sdk; NDK=$SDK/ndk/27.2.12479018; BT=$SDK/build-tools/35.0.1; AJAR=$SDK/platforms/android-34/android.jar
+[ -f android/env.local.sh ] && source android/env.local.sh
+SDK=${ANDROID_SDK:-C:/Android/sdk}; NDK=$SDK/ndk/27.2.12479018; BT=$SDK/build-tools/35.0.1; AJAR=$SDK/platforms/android-34/android.jar
 CMAKE=$SDK/cmake/3.22.1/bin/cmake.exe; NINJA=$SDK/cmake/3.22.1/bin/ninja.exe
-export JAVA_HOME="C:/Program Files/Eclipse Adoptium/jdk-21.0.12.101-hotspot"; export PATH="$JAVA_HOME/bin:$PATH"
+export JAVA_HOME="${JAVA_HOME:-C:/Program Files/Eclipse Adoptium/jdk-21}"; export PATH="$JAVA_HOME/bin:$PATH"
 ABIS=${@:-x86_64 arm64-v8a}; B=build/android; mkdir -p $B
 SRC_ASSETS=${GC1_GAME:-build/out/game_ptbr}; SRC_AUDIO=${GC1_AUDIO:-build/out/audio}
 # 1. nativo
