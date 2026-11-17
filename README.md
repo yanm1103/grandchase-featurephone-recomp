@@ -1,6 +1,8 @@
-# Grand Chase 1 (LG U+ / WIPI-C) — recomp · 그랜드체이스 1 리컴파일
+# Grand Chase (feature phone · LG U+ / WIPI-C) — recomp · 그랜드체이스 피처폰 리컴파일
 
 **[Português (BR)](#português-br) · [한국어](#한국어)**
+
+![Tela de título, Floresta dos Desafios (Cavaleira) e Ponte do Inferno (Mestra dos Sabres) / 타이틀 화면과 게임 플레이](docs/img/banner.png)
 
 *Static recompilation of the Korean feature-phone game Grand Chase 1 (WIPI-C, ARM → C) with an SDL3 runtime. No game files included.*
 
@@ -30,7 +32,16 @@ build/out/gc1.exe --res /caminho/do/jar --save save [--audio audio] [--scale 3] 
 Teclas: setas · **Enter/Z/Espaço** = ação · **Q/A** = tecla esquerda · **W/S/Esc** = tecla direita · Backspace/C = limpar · 0-9, `*`, `#` · F1 = ajuda · F11 = tela cheia. Gamepad: D-pad, A, X, B.
 O áudio precisa de clipes pré-renderizados (`tools/make_audio.py`); sem `--audio` o jogo roda sem som.
 
-**Retradução PT-BR:** `tools/translate/` (precisa dos jars `ko` e `pt` extraídos em `$GC1_EXTRACTED`). **Android:** `android/README.md`.
+**Android** (monte o seu APK; ele embute os arquivos do jogo, então é só para uso pessoal):
+```bash
+bash build/build.sh sdl                                   # uma vez: gera gen/
+mkdir -p build/out/audio                                  # pasta de áudio (pode ficar vazia)
+GC1_GAME=/caminho/do/jar bash android/build_apk.sh arm64-v8a
+adb install -r build/android/gc1.apk
+```
+Precisa de Android SDK (platform 34, build-tools 35.0.1, NDK 27.2, cmake 3.22.1), JDK 21 e o código-fonte do SDL3 3.4.20 em `third_party/SDL3-3.4.20-src/`; aponte `ANDROID_SDK` e `JAVA_HOME` (ou crie `android/env.local.sh`). O jogo usa controles de toque; detalhes em [`android/README.md`](android/README.md).
+
+**Retradução PT-BR:** `tools/translate/` (precisa dos jars `ko` e `pt` extraídos em `$GC1_EXTRACTED`).
 **Mais:** [arquitetura e validação](docs/ARQUITETURA.md) · [pendências](PROBLEMAS.md) · [licenças de terceiros](THIRD_PARTY_NOTICES.md) · licença do código: MIT.
 
 ---
@@ -59,5 +70,14 @@ build/out/gc1.exe --res /jar/경로 --save save [--audio audio] [--scale 3] [--f
 키: 방향키 · **Enter/Z/Space** = 확인 · **Q/A** = 왼쪽 소프트키 · **W/S/Esc** = 오른쪽 소프트키 · Backspace/C = 지우기 · 0-9, `*`, `#` · F1 = 도움말 · F11 = 전체 화면. 게임패드: 십자키, A, X, B.
 소리를 내려면 미리 렌더링한 오디오 클립이 필요합니다(`tools/make_audio.py`). `--audio`가 없으면 소리 없이 실행됩니다.
 
-**PT-BR 재번역:** `tools/translate/` (`$GC1_EXTRACTED`에 압축을 푼 `ko`, `pt` jar 필요). **안드로이드:** `android/README.md`.
+**안드로이드** (직접 APK를 만드세요. 게임 파일이 APK에 들어가므로 개인 용도로만 사용):
+```bash
+bash build/build.sh sdl                                   # 한 번만: gen/ 생성
+mkdir -p build/out/audio                                  # 오디오 폴더 (비어 있어도 됨)
+GC1_GAME=/jar/경로 bash android/build_apk.sh arm64-v8a
+adb install -r build/android/gc1.apk
+```
+필요한 것: Android SDK(platform 34, build-tools 35.0.1, NDK 27.2, cmake 3.22.1), JDK 21, 그리고 `third_party/SDL3-3.4.20-src/`에 SDL3 3.4.20 소스. `ANDROID_SDK`, `JAVA_HOME`을 지정하거나 `android/env.local.sh`를 만드세요. 터치 조작을 사용하며, 자세한 내용은 [`android/README.md`](android/README.md)를 참고하세요.
+
+**PT-BR 재번역:** `tools/translate/` (`$GC1_EXTRACTED`에 압축을 푼 `ko`, `pt` jar 필요).
 **더 보기:** [구조와 검증](docs/ARQUITETURA.md) · [알려진 문제](PROBLEMAS.md) · [서드파티 라이선스](THIRD_PARTY_NOTICES.md) · 코드 라이선스: MIT.
