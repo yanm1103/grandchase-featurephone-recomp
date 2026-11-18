@@ -333,6 +333,47 @@ static uint32_t hook_monster_name(Cpu *c) {
     *c = saved; return lr;
 }
 
+/* ---------------- curva de EXP ----------------
+ * calc_exp_to_next_level (0x96f0) devolve o EXP para subir do nivel L: g(L)-g(L-1), g(L) = ((500L + 2500L/11) * L^2 / 10) / 2 (~109*L^2).
+ * O EXP dos monstros e linear (~40L + 0.29L^2), entao no original o numero de mortes por nivel sobe sem parar (55 no Lv25, 100 no Lv50, 170 no Lv120).
+ * Aqui o custo e limitado a G_XP_KILLS mortes de um monstro do mesmo nivel (padrao 25): min(original, kills * (40L + 0.29L^2)). So afeta o jogador (o pet usa
+ * exp_required_for_level) e nao muda o EXP de missoes/monstros. GC1_XPKILLS=n troca o alvo; 0 devolve a curva original. */
+#define A_EXP_TO_NEXT 0x96f0u
+#define G_PLAYER_LEVEL 0x1632a1du
+#define G_EXP_TO_NEXT  0x162c438u
+static int g_xpkills = 25, g_xpon;
+static int64_t exp_g(int64_t l) { return (((500 * l + (l * 2500) / 11) * l * l) / 10) >> 1; }
+static uint32_t exp_for_level(uint32_t l) {
+    int64_t orig = exp_g(l) - exp_g((int64_t)l - 1);
+    if (g_xpkills > 0) { int64_t cap = (int64_t)g_xpkills * (4000 * (int64_t)l + 29 * (int64_t)l * l) / 100; if (cap < orig) orig = cap; }
+    return (uint32_t)orig;
+}
+static uint32_t hook_exp_to_next(Cpu *c) {
+    uint32_t lr = c->r[14]; c->r[0] = exp_for_level(LD8(G_PLAYER_LEVEL)); return lr;
+}
+/* gain_exp_and_level_up (0x114fc) so sobe ate 2 niveis por chamada e, no 2o nivel, deixa o EXP que sobra com o SINAL TROCADO (player_exp = need - resto):
+ * com a curva original quase nunca acontecia (precisa de ganho > 1 nivel), com niveis baratos e comum (missao/chefe valem 1-2 niveis). Aqui o original roda,
+ * o sinal e corrigido e, se ainda sobrar EXP para outro nivel (inclusive EXP acumulado antes da curva nova), ele roda de novo com ganho 0 ate esvaziar. */
+#define A_GAIN_EXP    0x114fcu
+#define G_PLAYER_EXP  0x162c434u
+static BlockFn orig_gain;
+static uint32_t hook_gain_exp(Cpu *c) {
+    Cpu saved = *c; uint32_t lr = c->r[14];
+    uint32_t i0 = (A_GAIN_EXP - TEXT_BASE) >> 1; BlockFn hook = gc_blocks[i0]; gc_blocks[i0] = orig_gain;
+    gcall(A_GAIN_EXP, 2, saved.r[0], saved.r[1], 0, 0, 0, 0);
+    for (int k = 0; k < 16; k++) {
+        int32_t e = (int32_t)LD32(G_PLAYER_EXP);
+        if (e < 0) { e = -e; ST32(G_PLAYER_EXP, (uint32_t)e); }
+        if (LD8(G_PLAYER_LEVEL) >= 250 || LD32(G_EXP_TO_NEXT) == 0 || (uint32_t)e < LD32(G_EXP_TO_NEXT)) break;
+        gcall(A_GAIN_EXP, 2, 0xffffffffu, 0, 0, 0, 0, 0);
+    }
+    gc_blocks[i0] = hook; *c = saved; return lr;
+}
+static void refresh_exp_to_next(void) {                      /* foto de estado antiga: a barra de EXP guarda o valor da curva velha */
+    uint32_t l = LD8(G_PLAYER_LEVEL);
+    if (g_xpon && l >= 1 && l < 250 && LD32(G_EXP_TO_NEXT) != 0) ST32(G_EXP_TO_NEXT, exp_for_level(l));
+}
+
 static BlockFn install(uint32_t addr, BlockFn fn) { uint32_t i = (addr - TEXT_BASE) >> 1; BlockFn o = NULL; if (i < gc_text_halfwords && gc_blocks[i]) { o = gc_blocks[i]; gc_blocks[i] = fn; } return o; }
 /* Fotos de estado gravadas enquanto o nome do monstro estourava o buffer (ver hook_monster_name) trazem flags e slot de save corrompidos; limpa o que e so flag/slot. */
 static void sanitize_overflow(void) {
@@ -341,7 +382,7 @@ static void sanitize_overflow(void) {
     for (uint32_t a = 0x162b747; a <= 0x162b749; a++) if (LD8(a) > 1) ST8(a, 0);   /* boss_warning_active, screen_shake_active, screen_overlay_active */
     if (LD8(0x162b748) == 0) ST8(0x162b74a, 0);                  /* duracao do tremor (so vale com o tremor ligado) */
 }
-void gc1_patches_reset(void) { g_acc_img[3] = 0; sanitize_overflow(); }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
+void gc1_patches_reset(void) { g_acc_img[3] = 0; sanitize_overflow(); refresh_exp_to_next(); }          /* depois de carregar um save state: a folha de acentos (no heap do guest) pode nao existir mais */
 void gc1_patches_install(void) {
     if (g_patched) return; g_patched = 1;
     if (getenv("GC1_NOPATCH")) return;                       /* depuracao: roda o motor original */
@@ -353,4 +394,7 @@ void gc1_patches_install(void) {
     orig_walk = install(A_WALK_ANIM, hook_walk_anim);
     orig_shop = install(A_SHOP_REBUILD, hook_shop_rebuild);
     orig_monname = install(A_MONSTER_NAME, hook_monster_name);
+    if (getenv("GC1_XPKILLS")) g_xpkills = atoi(getenv("GC1_XPKILLS"));
+    g_xpon = install(A_EXP_TO_NEXT, hook_exp_to_next) != NULL;
+    orig_gain = install(A_GAIN_EXP, hook_gain_exp);
 }
